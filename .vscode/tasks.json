@@ -2,10 +2,22 @@
 	"version": "2.0.0",
 	"tasks": [
 	  {
-		"label": "Build Dev",
+		"label": "Dev: Build",
 		"detail": "Runs build tasks for development and debugging purposes and imports the PS Module",
 		"type": "shell",
 		"command": "./build_dev.ps1",
+		"problemMatcher": [],
+		"presentation": {
+		  "reveal": "always",
+		  "panel": "shared"
+		},
+		"group": "build"
+	  },
+	  {
+		"label": "Release: Build",
+		"detail": "Runs build tasks for release and outputs to the \build folder",
+		"type": "shell",
+		"command": "./build_release.ps1",
 		"problemMatcher": [],
 		"presentation": {
 		  "reveal": "always",

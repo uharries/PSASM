@@ -5,7 +5,7 @@
 		"name": "Debug Module (Build Dev + Test Script)",
 		"type": "PowerShell",
 		"request": "launch",
-		// "preLaunchTask": "Build Dev",
+		// "preLaunchTask": "Dev: Build",
 		"script": "${workspaceFolder}/test/debugLaunch.ps1"
 	  }
 	]
