@@ -1,0 +1,12 @@
+{
+	"version": "0.2.0",
+	"configurations": [
+	  {
+		"name": "Debug Module (Build Dev + Test Script)",
+		"type": "PowerShell",
+		"request": "launch",
+		// "preLaunchTask": "Build Dev",
+		"script": "${workspaceFolder}/test/debugLaunch.ps1"
+	  }
+	]
+  }

@@ -1,0 +1,7 @@
+{
+	// #ihatespaces
+	"editor.insertSpaces": false,
+	"editor.tabSize": 4,
+	"files.trimTrailingWhitespace": true,
+
+}

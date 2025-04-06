@@ -1,0 +1,17 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+	  {
+		"label": "Build Dev",
+		"detail": "Runs build tasks for development and debugging purposes and imports the PS Module",
+		"type": "shell",
+		"command": "./build_dev.ps1",
+		"problemMatcher": [],
+		"presentation": {
+		  "reveal": "always",
+		  "panel": "shared"
+		},
+		"group": "build"
+	  }
+	]
+  }
