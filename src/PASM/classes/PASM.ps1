@@ -18,32 +18,27 @@ class PASM {
     [UInt16]$loadAddress
 	[hashtable]$symbols
 	[System.Collections.ArrayList]$assembly
-	[string[]]$asmSource
+	[string]$asmSource
 	[string[]]$workSource
-	[string[]]$psSource
+	[string]$psSource
 	[byte[]]$binary
 	[string]$binaryHash
 	[int]$MaxPasses = 10
 	[int]$CurrentPass = 0
 	[hashtable]$sourceMap
 	[bool]$NoHostOutput
+	[Parser]$parser
 
 	PASM() {
 		$this.Init()
 	}
 
-	PASM([string[]]$asmSource, [bool]$NoHostOutput) {
+	PASM([string]$asmSource, [bool]$NoHostOutput) {
 		$this.Init()
-		$this.asmSource = $asmSource.Split([char[]]("`n","`r"),[System.StringSplitOptions]::RemoveEmptyEntries)
-		$this.workSource = $this.asmSource.Clone()
+		# $this.asmSource = $asmSource.Split([char[]]("`n","`r"),[System.StringSplitOptions]::RemoveEmptyEntries)
+		$this.asmSource = $asmSource
+		# $this.workSource = $this.asmSource.Clone()
 		$this.NoHostOutput = $NoHostOutput
-	}
-
-	PASM([string[]]$asmSource) {
-		$this.Init()
-		$this.asmSource = $asmSource.Split([char[]]("`n","`r"),[System.StringSplitOptions]::RemoveEmptyEntries)
-		$this.workSource = $this.asmSource.Clone()
-		$this.NoHostOutput = $false
 	}
 
 	hidden [void]Init() {
@@ -422,7 +417,24 @@ class PASM {
 		# write-host $this.workSource
 	}
 
-	[void]Parse() {
+	[Parser]Parse() {
+		$this.parser = [Parser]::new($this.asmSource)
+		$this.psSource = $this.parser.outTokens.value -join ''
+
+		# Create symbol table and ps vars for all labels
+		$this.parser.symbols.GetEnumerator().ForEach({
+			$this.symbols.Add($_.Value, [ordered]@{
+				value = $null
+				width = 16
+				resolved = $false
+				references = @()
+			})
+			Set-Variable -Name "__SYM_$($_.Value)" -Value 0x0000 -Scope Script
+		})
+		return $this.parser
+	}
+
+	[void]ParseOld() {
 		$this.workSource = $this.workSource -replace '/\*', '<#'									# Replace C style block comment start with PowerShell block comment start
 		$this.workSource = $this.workSource -replace '\*/', '#>'									# Replace C style block comment end with PowerShell block comment end
 		# Block comments pose a problem for MapSource if they contain mnemonics or labels or references,

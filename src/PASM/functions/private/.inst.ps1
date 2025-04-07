@@ -2,12 +2,12 @@ function .inst {
 	[PASM()] param (
 		[Parameter(position=0,Mandatory=$true)]
 		[Alias("mn")]
-		[ValidateScript({[MOS6502]::OpCodes.$_}, ErrorMessage="Unknown mnemonic: '{0}'")]
+		# [ValidateScript({[MOS6502]::OpCodes.$_}, ErrorMessage="Unknown mnemonic: '{0}'")]
 		[string]$Mnemonic,
 
 		[Parameter(position=1,Mandatory=$true)]
 		[Alias("am")]
-		[ValidateScript({[MOS6502]::OpCodes.$Mnemonic.$_}, ErrorMessage="Unknown addressing mode '{0}' for mnemonic")]
+		# [ValidateScript({[MOS6502]::OpCodes.$Mnemonic.$_}, ErrorMessage="Unknown addressing mode '{0}' for mnemonic")]
 		[string]$AddressingMode,
 
 		[Parameter(position=2,Mandatory=$false)]

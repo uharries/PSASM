@@ -97,7 +97,7 @@ function Invoke-Assembler {
 
 	PROCESS {
 		if ($SourceFile) {
-			$Source = Get-Content -Path $SourceFile
+			$Source = Get-Content -Path $SourceFile -Raw
 		}
 		if ($Source) {
 			$asmSource += $Source
@@ -105,11 +105,12 @@ function Invoke-Assembler {
 	}
 
 	END {
+		# $pasm = [PASM]::new($asmSource -join "`n", $NoHostOutput)
 		$pasm = [PASM]::new($asmSource -join "`n", $NoHostOutput)
 		$pasm.Parse()
 
 		if ($DumpPSfile) {
-			$pasm.workSource | set-content -path $DumpPSfile -Force
+			$pasm.psSource | set-content -path $DumpPSfile -Force
 		}
 
 		$asmInfo = $pasm.Assemble()
@@ -132,7 +133,10 @@ function Invoke-Assembler {
 			if (-not $NoHostOutput) {
 				Write-Host ("`nWriting '$OutFile'...") -NoNewline
 			}
-			$asmInfo.Binary | set-content -asbytestream -path $OutFile
+			if (-not(Test-Path -Path $OutFile)) {
+				New-Item -Path $OutFile -Force
+			}
+			$asmInfo.Binary | set-content -asbytestream -path $OutFile -Force
 			if (-not $NoHostOutput) {
 				Write-Host ("File Hash: {0:x}" -f ((Get-FileHash -Algorithm SHA256 $OutFile).Hash))
 			}

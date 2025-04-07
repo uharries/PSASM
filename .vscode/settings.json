@@ -3,5 +3,5 @@
 	"editor.insertSpaces": false,
 	"editor.tabSize": 4,
 	"files.trimTrailingWhitespace": true,
-
+	"powershell.debugging.createTemporaryIntegratedConsole": true
 }
