@@ -492,7 +492,7 @@ class PASM {
 			}
 
 			try {
-				Invoke-Command -ScriptBlock $sb -ErrorAction Stop -ErrorVariable psError -NoNewScope
+				Invoke-Command -ScriptBlock $sb -ErrorAction Stop -ErrorVariable psError #-NoNewScope
 			} catch {
 				# Write-Error -Message ("Error in psSource line {0}, column {1}: {2} '{3}' {4}" -f $error[0].InvocationInfo.ScriptLineNumber, $error[0].InvocationInfo.OffsetInLine, $error[0].CategoryInfo.Reason, $error[0].CategoryInfo.TargetName, $error[0].Exception.Message)
 				# Write-Error -Message ("Error in psSource line {0}, column {1}: {2} '{3}'" -f $error[0].InvocationInfo.ScriptLineNumber, $error[0].InvocationInfo.OffsetInLine, $error[0].CategoryInfo.Reason, $error[0].CategoryInfo.TargetName) -ErrorAction Stop
