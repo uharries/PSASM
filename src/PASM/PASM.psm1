@@ -1,3 +1,8 @@
+# --- Load Globals ---
+Get-ChildItem -Path "$PSScriptRoot\Globals\*.ps1" -ErrorAction Ignore | ForEach-Object {
+	. $_.FullName
+}
+
 # --- Load Enums ---
 Get-ChildItem -Path "$PSScriptRoot\Enums\*.ps1" -ErrorAction Ignore | ForEach-Object {
 	. $_.FullName

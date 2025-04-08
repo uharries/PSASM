@@ -23,7 +23,7 @@ class PASM {
 	[string]$psSource
 	[byte[]]$binary
 	[string]$binaryHash
-	[int]$MaxPasses = 10
+	[int]$MaxPasses = 300
 	[int]$CurrentPass = 0
 	[hashtable]$sourceMap
 	[bool]$NoHostOutput

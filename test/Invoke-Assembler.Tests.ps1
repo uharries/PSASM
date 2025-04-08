@@ -151,6 +151,10 @@ Describe 'Invoke-Assembler Function' {
 			### Again, I choose not to support this.. labels should be labels, even if they are conflicting with mnemonics
 			# @{ code = 'bne:+;:'; binary = @(0,0,0xd0,0x00)}
 
+			@{ code = '.org (6145%$1000);lda#%11011'; binary = @(0x01,0x08,0xa9,0x1b)}
+			@{ code = '.pc (6145%%1000);lda#%100%3'; binary = @(0x01,0x00,0xa9,0x01)}
+			@{ code = '.pc (3*$12);lda#$100%$a'; binary = @(0x36,0x00,0xa9,0x06)}
+
 			@{ code = '.text "ABCabc",0'; binary = @(0, 0, 65, 66, 67, 97, 98, 99, 0)}
 			@{ code = ".text 'ABCabc',0"; binary = @(0, 0, 65, 66, 67, 97, 98, 99, 0)}
 			@{ code = '.text "ABCabc",0 -AsPETSCII'; binary = @(0, 0, 97, 98, 99, 65, 66, 67, 0)}

@@ -160,7 +160,7 @@ class Tokenizer {
 	[Token] ScanNumber() {
 		if($this.PeekChar() -eq 'x') {
 			$this.SkipChar()
-			while($this.GetChar() -in '0','1','2','3','4','5','6','7','8','9','a','b','c','d','e','f') {}
+			while($this.GetChar() -in $script:CharsHex) {}
 			$this.UnGetChar()
 			return $this.NewToken([TokenType]::NumericLiteral)
 		}
@@ -176,23 +176,23 @@ class Tokenizer {
 				$this.UnGetChar()
 				return $this.NewToken([TokenType]::NumericLiteral)
 			}
-			while($this.GetChar() -in '0','1','2','3','4','5','6','7','8','9') {}
+			while($this.GetChar() -in $script:Chars0to9) {}
 			$this.UnGetChar()
 			return $this.NewToken([TokenType]::NumericLiteral)
 		}
-		while($this.GetChar() -in '0','1','2','3','4','5','6','7','8','9') {}
+		while($this.GetChar() -in $script:Chars0to9) {}
 		$this.UnGetChar()
 		return $this.NewToken([TokenType]::NumericLiteral)
 	}
 
 	[Token] ScanVariable() {
-		while($this.GetChar() -in [char[]]([char]'0'..[char]'9' + [char]'A'..[char]'Z' + [char]'_')) {}
+		while($this.GetChar() -in $script:CharsIdentifier) {}
 		$this.UnGetChar()
 		return $this.NewToken([TokenType]::PSVariable)
 	}
 
 	[Token] ScanMember() {
-		while($this.GetChar() -in [char[]]([char]'0'..[char]'9' + [char]'A'..[char]'Z' + [char]'_')) {}
+		while($this.GetChar() -in $script:CharsIdentifier) {}
 		$this.UnGetChar()
 		return $this.NewToken([TokenType]::Member)
 	}
@@ -238,7 +238,32 @@ class Tokenizer {
 			'-' {return $this.NewToken([TokenType]::Minus)}
 			'/' {return $this.NewToken([TokenType]::Divide)}
 			'*' {return $this.NewToken([TokenType]::Asterisk)}
-			'%' {return $this.NewToken([TokenType]::Modulo)}
+			'%' {
+				$i=-1
+				while($this.tokens[$i].Type -notin $null, [TokenType]::SemiColon, [TokenType]::NewLine) {
+					if($this.tokens[$i--].Type -in [TokenType]::Mnemonic, [TokenType]::Directive) {
+						$k=-1
+						while($this.tokens[$k].Type -notin [TokenType]::Mnemonic, [TokenType]::Directive) {
+							if($this.tokens[$k].Type -in [TokenType]::Whitespace) {
+								$k--
+								continue
+							}
+							if($this.tokens[$k--].Type -in [TokenType]::Hash, [TokenType]::Comma, [TokenType]::Divide, [TokenType]::Equals, [TokenType]::LAngle, [TokenType]::RAngle, [TokenType]::LParen, [TokenType]::Minus, [TokenType]::Modulo, [TokenType]::Plus, [TokenType]::Asterisk) {
+								$cnt=0
+								while($this.GetChar() -in $script:CharsBin) {$cnt++}
+								$this.UnGetChar()
+								if($cnt -gt 0 -and $this.PeekChar() -match '\W') {
+									return $this.NewToken([TokenType]::NumericLiteral)
+								} else {
+									# return $this.ScanVariable()
+								}
+							}
+							return $this.NewToken([TokenType]::Modulo)
+						}
+					}
+				}
+				return $this.NewToken([TokenType]::Modulo)
+			}
 			'=' {return $this.NewToken([TokenType]::Equals)}
 			',' {return $this.NewToken([TokenType]::Comma)}
 			'|' {return $this.NewToken([TokenType]::Pipe)}
@@ -276,7 +301,8 @@ class Tokenizer {
 				if($c1 -eq '+' -or $c1 -eq '-') {
 					while($this.GetChar() -eq $c1) {}
 					$this.UnGetChar()
-					if($this.PeekChar() -in [char[]]([char]'$' + [char]'0'..[char]'9' + [char]'A'..[char]'Z' + [char]'_')) {
+					$ccc = $this.PeekChar()
+					if($this.PeekChar() -in ([char[]]'$' + $script:CharsIdentifier)) {
 						$this.UnGetChar()
 					}
 					return $this.NewToken([TokenType]::AnonymousReference)
@@ -287,7 +313,7 @@ class Tokenizer {
 				}
 				return $this.NewToken([TokenType]::AnonymousLabel)
 			}
-			{$_ -in [char[]]([char]'0'..[char]'9')} {
+			{$_ -in $script:Chars0to9} {
 				return $this.ScanNumber()
 			}
 			'$' {
@@ -295,9 +321,9 @@ class Tokenizer {
 				while($this.tokens[$i].Type -notin $null, [TokenType]::SemiColon, [TokenType]::NewLine){
 					if($this.tokens[$i--].Type -in [TokenType]::Mnemonic, [TokenType]::Directive) {
 						$cnt=0
-						while($this.GetChar() -in '0','1','2','3','4','5','6','7','8','9','a','b','c','d','e','f') {$cnt++}
+						while($this.GetChar() -in $script:CharsHex) {$cnt++}
 						$this.UnGetChar()
-						if($cnt -gt 0 -and $cnt -le 0xffff -and $this.PeekChar() -match '\W') {
+						if($cnt -gt 0 -and $this.PeekChar() -match '\W') {
 							return $this.NewToken([TokenType]::NumericLiteral)
 						} else {
 							# return $this.ScanVariable()
@@ -307,11 +333,11 @@ class Tokenizer {
 				return $this.ScanVariable()
 			}
 
-			{$_ -in [char[]]([char]'_' + [char]'A'..[char]'Z')} {
+			{$_ -in [char[]]($script:Char_ + $script:CharsAtoZ)} {
 				return $this.ScanIdentifier()
 			}
 			default {
-				return [Token]::new([TokenType]::Unknown,$c,$this.tokenStart,$_.Length)
+				return $this.NewToken([TokenType]::Unknown)
 			}
 		}
 		Write-Host "'$c' at $($this.cpos ) WHAT?! this should not happen."

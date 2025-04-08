@@ -160,12 +160,33 @@ class Parser {
 			}
 
 			([TokenType]::Asterisk) {
+				$match = $false
 				$j=1
 				while($tokenIndex-$j -ge 0 -and $this.inTokens[$tokenIndex-$j].Type -notin $null, [TokenType]::SemiColon, [TokenType]::NewLine){
 					if($this.inTokens[$tokenIndex-$j++].Type -in [TokenType]::Mnemonic, [TokenType]::Directive) {
-						$this.AddToken("(.pc)")
+						$k=1
+						while($tokenIndex-$k -ge 0 -and $this.inTokens[$tokenIndex-$k].Type -notin [TokenType]::Mnemonic, [TokenType]::Directive){
+							if($this.inTokens[$tokenIndex-$k].Type -in [TokenType]::Whitespace) {
+								$k++
+								continue
+							}
+							if($this.inTokens[$tokenIndex-$k++].Type -in [TokenType]::Comma, [TokenType]::Divide, [TokenType]::Equals, [TokenType]::LAngle, [TokenType]::RAngle, [TokenType]::LParen, [TokenType]::Minus, [TokenType]::Modulo, [TokenType]::Plus, [TokenType]::Asterisk) {
+								$this.AddToken("(.pc)")
+							} else {
+								$this.AddToken($token.Value)
+							}
+							$match = $true
+							break
+						}
+						if(-not $match) {
+							$this.AddToken("(.pc)")
+							$match = $true
+						}
 						break
 					}
+				}
+				if(-not $match) {
+					$this.AddToken($token.Value)
 				}
 			}
 
@@ -217,14 +238,14 @@ class Parser {
 				enum State {Init; Immediate; Absolute; AbsoluteIndexed; AbsoluteIndexedX; AbsoluteIndexedY; Indirect; IndirectAbsolute; IndirectIndexed; IndirectIndexedY; Indexed; IndexedX; IndexedXIndirect}
 
 				$state=[State]::Init
-				$operatorTokensIndex=@()
+				$operandTokensIndex=@()
 				$parenCount=0
 				for($i=$tokenIndex;$i -lt $instEndIndex;$i++) {
 					$tk = $this.inTokens[$i]
 					switch($tk.Type) {
 						([TokenType]::Whitespace) {break}
-						([TokenType]::Label) {$operatorTokensIndex+=$i; break}
-						([TokenType]::AnonymousLabel) {$operatorTokensIndex+=$i; break}
+						([TokenType]::Label) {$operandTokensIndex+=$i; break}
+						([TokenType]::AnonymousLabel) {$operandTokensIndex+=$i; break}
 
 						([TokenType]::Hash) {
 							if($state -eq [state]::Init) {$state = [state]::Immediate; break}
@@ -233,7 +254,7 @@ class Parser {
 						([TokenType]::LParen) {
 							$parenCount++
 							if($state -eq [state]::Init) {$state = [state]::Indirect; break}
-							$operatorTokensIndex+=$i
+							$operandTokensIndex+=$i
 						}
 
 						([TokenType]::RParen) {
@@ -241,38 +262,38 @@ class Parser {
 								if($state -eq [state]::Indirect) {$state = [state]::IndirectAbsolute; break}
 								if($state -eq [state]::IndexedX) {$state = [state]::IndexedXIndirect; break}
 							}
-							$operatorTokensIndex+=$i
+							$operandTokensIndex+=$i
 						}
 
 						([TokenType]::Comma) {
 							if($state -eq [state]::Absolute) {$state = [state]::AbsoluteIndexed; break}
 							if($state -eq [state]::Indirect) {$state = [state]::Indexed; break}
 							if($state -eq [state]::IndirectAbsolute) {$state = [state]::IndirectIndexed; break}
-							$operatorTokensIndex+=$i
+							$operandTokensIndex+=$i
 						}
 
 						{$tk.Value -eq 'x'} {
 							if($state -eq [state]::Indexed) {$state = [state]::IndexedX; break}
 							if($state -eq [state]::AbsoluteIndexed) {$state = [state]::AbsoluteIndexedX; break}
-							$operatorTokensIndex+=$i
+							$operandTokensIndex+=$i
 						}
 
 						{$tk.Value -eq 'y'} {
 							if($state -eq [state]::IndirectIndexed) {$state = [state]::IndirectIndexedY; break}
 							if($state -eq [state]::AbsoluteIndexed) {$state = [state]::AbsoluteIndexedY; break}
-							$operatorTokensIndex+=$i
+							$operandTokensIndex+=$i
 						}
 
 						default {
 							if($state -eq [state]::Init) {$state = [state]::Absolute}
-							$operatorTokensIndex+=$i
+							$operandTokensIndex+=$i
 						}
 					}
 				}
 
 				$addressingMode = [MOS6502AddressingMode]$state.ToString()
 				$this.AddToken(" -AddressingMode $($addressingMode) -Operand (")
-				foreach($i in $operatorTokensIndex) {
+				foreach($i in $operandTokensIndex) {
 					$null = $this.ParseToken($i)
 				}
 				$this.AddToken(")")

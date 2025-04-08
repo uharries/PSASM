@@ -122,7 +122,7 @@ function Invoke-Assembler {
 			}
 		}
 
-		if ($ListBinary -or !$OutFile) {
+		if ($ListBinary) {
 			if (-not $NoHostOutput) {
 				Write-Host "`nListing Binary:`n"
 				Write-Host $asmInfo.BinaryList
