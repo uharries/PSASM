@@ -19,6 +19,7 @@ class PASM {
 	[hashtable]$symbols
 	[System.Collections.ArrayList]$assembly
 	[string]$asmSource
+	[string[]]$asmSourceLines
 	[string[]]$workSource
 	[string]$psSource
 	[byte[]]$binary
@@ -37,6 +38,7 @@ class PASM {
 		$this.Init()
 		# $this.asmSource = $asmSource.Split([char[]]("`n","`r"),[System.StringSplitOptions]::RemoveEmptyEntries)
 		$this.asmSource = $asmSource
+		$this.asmSourceLines = $asmSource.Split("`n")
 		# $this.workSource = $this.asmSource.Clone()
 		$this.NoHostOutput = $NoHostOutput
 	}
@@ -56,7 +58,7 @@ class PASM {
 	}
 
 	[void]AddLine([UInt16]$addr, [byte[]]$bytes, [System.Management.Automation.InvocationInfo]$invocation) {
-		$this.assembly.Add([AssemblyLine]::new($addr, $bytes, $invocation.ScriptLineNumber, $invocation.OffsetInLine, ($this.sourceMap.pasmCalls + $this.sourceMap.instructions).Where({$_.Line -eq $invocation.ScriptLineNumber})[0].Text, $invocation.Line.Trim(), $invocation.ScriptName))
+		$this.assembly.Add([AssemblyLine]::new($addr, $bytes, $invocation.ScriptLineNumber, $invocation.OffsetInLine, $this.asmSourceLines[$invocation.ScriptLineNumber-1], $invocation.Line.Trim(), $invocation.ScriptName))
 	}
 
 	[void]OpAdd([byte]$OpCode, [System.Management.Automation.InvocationInfo]$invocation) {
@@ -578,7 +580,8 @@ class PASM {
 			$col = $this.assembly[$lin].charPosition
 			$c = ("{0}" -f $this.assembly[$lin].psLineText.Trim())
 			$d = ("{0}" -f $this.assembly[$lin].asmLineText.Trim())
-			$sb.AppendFormat("`${0,-4}: {1,-9}- Ln: {2,-3} Col: {3,-3} - {4} - {5}", $a, $sbl.ToString(), $ln, $col, $d, $c)
+			# $sb.AppendFormat("`${0,-4}: {1,-9}- Ln: {2,-3} Col: {3,-3} - {4,-25} - {5}", $a, $sbl.ToString(), $ln, $col, $d, $c)
+			$sb.AppendFormat("`${0,-4}: {1,-9}- Ln: {2,-3} Col: {3,-3} - {4}", $a, $sbl.ToString(), $ln, $col, $d)
 			$sb.AppendLine()
 		}
 		return $sb.ToString()
