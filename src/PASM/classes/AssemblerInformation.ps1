@@ -1,6 +1,7 @@
 class AssemblerInformation {
 	[bool]$Success
 	[UInt16]$LoadAddress
+	[Scope[]]$Scopes
 	[hashtable]$Symbols
 	[string]$PSSource
 	[array]$SourceMap
@@ -13,9 +14,9 @@ class AssemblerInformation {
 	AssemblerInformation([array]$params) {
 		$this.Success = $params.Success
 		$this.LoadAddress = $params.LoadAddress
+		$this.Scopes = $params.Scopes
 		$this.Symbols = $params.Symbols
 		$this.PSSource = $params.PSSource
-		$this.SourceMap = $params.SourceMap
 		$this.Assembly = $params.Assembly
 		$this.AssemblyList = $params.AssemblyList
 		$this.Binary = $params.Binary

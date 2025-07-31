@@ -1,19 +1,22 @@
-class Parser {
+class SemanticParser {
 	[Tokenizer]$t
 	[Token[]]$inTokens
 	[System.Collections.Generic.List[object]]$outTokens
-	[System.Collections.Generic.List[object]]$symbols
+	[SymbolManager]$symbolManager
+	[ScopeManager]$scopeManager
 
-	Parser([string]$InputData) {
+	SemanticParser([string]$InputData) {
 		$this.t = [Tokenizer]::new($InputData)
+		$this.symbolManager = [SymbolManager]::new()
 		$this.inTokens = $this.t.tokens
 		$this.outTokens = [System.Collections.Generic.List[Token]]::new()
-		$this.symbols = [System.Collections.Generic.List[Token]]::new()
+		$this.scopeManager = [ScopeManager]::new()
 		$this.MapSymbols()
+		$this.MapScopes()
 		$this.ParseTokens(0, $this.inTokens.Count)
 	}
 
-	Parser() {}
+	SemanticParser() {}
 
 	# [Token] NewToken([string]$value) {
 	#     return [Token]::new([TokenType]::Unknown, $value)
@@ -27,14 +30,6 @@ class Parser {
 		$this.outTokens.Insert($index, [Token]::new([TokenType]::Unknown, $value))
 	}
 
-	[string]GetLabel([Token]$t) {
-		return ".label $($t.Value.Trim(':'));"
-	}
-
-	[string]ParseLabel([Token]$t) {
-		return ".label $($t.Value.Trim(':'));"
-	}
-
 	[int] SkipWhitespace([int]$tokenIndex) {
 		while($this.inTokens[$tokenIndex].Type -eq [TokenType]::WhiteSpace) {$tokenIndex++}
 		return $tokenIndex
@@ -43,6 +38,44 @@ class Parser {
 	[int] SkipWhitespaceBackwards([int]$tokenIndex) {
 		while($this.inTokens[$tokenIndex].Type -eq [TokenType]::WhiteSpace) {$tokenIndex--}
 		return $tokenIndex
+	}
+
+	hidden [int] LookBackForToken([int]$startIndex, [TokenType[]]$stopTypes, [TokenType[]]$matchTypes, [bool]$skipParenthesis) {
+		$i = 1
+		$depth = 0
+
+		while ($startIndex - $i -ge 0) {
+			$token = $this.inTokens[$startIndex - $i]
+
+			if ($skipParenthesis) {
+				if ($token.Type -eq [TokenType]::RParen) {
+					$depth++
+					$i++
+					continue
+				}
+				elseif ($token.Type -eq [TokenType]::LParen) {
+					if ($depth -gt 0) {
+						$depth--
+						$i++
+						continue
+					}
+				}
+			}
+
+			# Only consider stopTypes when outside parentheses
+			if ($depth -eq 0 -and $token.Type -in $stopTypes) {
+				break
+			}
+
+			# Only check for matchTypes outside parentheses
+			if ($depth -eq 0 -and $token.Type -in $matchTypes) {
+				return $startIndex - $i
+			}
+
+			$i++
+		}
+
+		return -1
 	}
 
 	[void] MapSymbols() {
@@ -60,8 +93,36 @@ class Parser {
 			$ref
 		}
 
-		$this.symbols = $labels + $anonymousLabels
+		($labels + $anonymousLabels).ForEach({
+			$this.symbolManager.AddUnscopedSymbol($_.Value)
+		})
 	}
+
+	[void] MapScopes() {
+		for ($tokenIndex = 0; $tokenindex -lt $this.inTokens.Count; $tokenIndex++) {
+			$token = $this.inTokens[$tokenIndex]
+			switch($token.Type) {
+				([TokenType]::LCurly) {
+					$matchedIndex = $this.LookBackForToken($tokenIndex, @([TokenType]::LCurly, [TokenType]::RCurly, [TokenType]::Pipe), @([TokenType]::Label, [TokenType]::AnonymousLabel, [TokenType]::Identifier), $true)
+					if ($matchedIndex -ge 0) {
+						$this.scopeManager.EnterNewScope($this.inTokens[$matchedIndex].Value, $tokenIndex, $token.Line, $token.Column)
+					} else {
+						$this.scopeManager.EnterNewScope($tokenIndex, $token.Line, $token.Column)
+					}
+				}
+
+				([TokenType]::RCurly) {
+					$this.scopeManager.ExitNewScope($tokenIndex, $token.Line, $token.Column)
+				}
+
+				([TokenType]::EOF) {
+					$this.scopeManager.ExitNewScope($tokenIndex, $token.Line, $token.Column)
+				}
+			}
+		}
+		$this.symbolManager.scopes = $this.scopeManager.scopes
+	}
+
 
 	[int] ParseToken([int]$tokenIndex) {
 		$token = $this.inTokens[$tokenIndex]
@@ -69,30 +130,36 @@ class Parser {
 			([TokenType]::Label) {
 				$j=1
 				$inInstr=$false
+				$symbolName = $token.Value.Trim(':')
 				while($tokenIndex-$j -ge 0 -and $this.inTokens[$tokenIndex-$j].Type -notin $null, [TokenType]::SemiColon, [TokenType]::NewLine){
 					if($this.inTokens[$tokenIndex-$j++].Type -eq [TokenType]::Mnemonic) {
-						$this.InsertToken($this.outTokens.Count-$j+1, ".label $($token.Value.Trim(':')) ((.pc) + 1);")
+						$this.InsertToken($this.outTokens.Count-$j+1, ".label -name $symbolName -scopeId $($this.scopeManager.GetCurrentScope()) -addr ((.pc) + 1);")
 						$inInstr = $true
+						$this.symbolManager.AddUnresolvedSymbol($symbolName, $this.scopeManager.GetCurrentScope(), $token.Line, $token.Column)
 						break
 					}
 				}
 				if(-not $inInstr) {
-					$this.AddToken(".label $($token.Value.Trim(':'));")
+					$this.AddToken(".label -name $symbolName -scopeId $($this.scopeManager.GetCurrentScope());")
+					$this.symbolManager.AddUnresolvedSymbol($symbolName, $this.scopeManager.GetCurrentScope(), $token.Line, $token.Column)
 				}
 			}
 
 			([TokenType]::AnonymousLabel) {
 				$j=1
 				$inInstr=$false
+				$symbolName = "ANON_L$($token.Line)_C$($token.Column)"
 				while($tokenIndex-$j -ge 0 -and $this.inTokens[$tokenIndex-$j].Type -notin $null, [TokenType]::SemiColon, [TokenType]::NewLine){
 					if($this.inTokens[$tokenIndex-$j++].Type -eq [TokenType]::Mnemonic) {
-						$this.InsertToken($this.outTokens.Count-$j+1, ".label ANON_L$($token.Line)_C$($token.Column) ((.pc) + 1);")
+						$this.InsertToken($this.outTokens.Count-$j+1, ".label -name $symbolName -scopeId $($this.scopeManager.GetCurrentScope()) -addr ((.pc) + 1);")
 						$inInstr = $true
+						$this.symbolManager.AddUnresolvedSymbol($symbolName, $this.scopeManager.GetCurrentScope(), $token.Line, $token.Column)
 						break
 					}
 				}
 				if(-not $inInstr) {
-					$this.AddToken(".label ANON_L$($token.Line)_C$($token.Column);")
+					$this.AddToken(".label -name $symbolName -scopeId $($this.scopeManager.GetCurrentScope());")
+					$this.symbolManager.AddUnresolvedSymbol($symbolName, $this.scopeManager.GetCurrentScope(), $token.Line, $token.Column)
 				}
 			}
 
@@ -106,16 +173,24 @@ class Parser {
 			# }
 
 			([TokenType]::AnonymousReference) {
-				if($token.Value -in $this.symbols.Value) {
-					$this.AddToken("`$script:__SYM_$($token.Value)")
-				} else {
-					$this.AddToken($token.Value)
-				}
+				# if($this.symbolManager.TestSymbol($token.Value, $this.scopeManager.GetCurrentScope())) {
+					$this.AddToken("`(_getSymbol '$($token.Value)' $($this.scopeManager.GetCurrentScope()))")
+					# $this.AddToken("`$script:__SYM_$($token.Value)")
+				# } else {
+					# $this.AddToken($token.Value)
+				# }
 			}
 
 			([TokenType]::Identifier) {
-				if($token.Value -in $this.symbols.Value) {
-					$this.AddToken("`$script:__SYM_$($token.Value)")
+				$tval = $token.Value
+				$ti = $tokenIndex
+				while ($this.inTokens[$ti+1].Type -eq [TokenType]::Member) {
+					$ti++
+					$tval += $this.inTokens[$ti].Value
+				}
+				if($this.symbolManager.TestSymbol($tval, $this.scopeManager.GetCurrentScope())) {
+					$this.AddToken("`(_getSymbol '$($tval)' $($this.scopeManager.GetCurrentScope()))")
+					$tokenIndex = $ti
 				} else {
 					$this.AddToken($token.Value)
 				}
@@ -159,6 +234,16 @@ class Parser {
 				}
 			}
 
+			([TokenType]::LCurly) {
+				$this.scopeManager.EnterScope($tokenIndex)
+				$this.AddToken($token.Value)
+			}
+
+			([TokenType]::RCurly) {
+				$this.scopeManager.ExitScope()
+				$this.AddToken($token.Value)
+			}
+
 			([TokenType]::Asterisk) {
 				$match = $false
 				$j=1
@@ -191,7 +276,7 @@ class Parser {
 			}
 
 			([TokenType]::Directive) {
-				if($token.Value -eq '.macro') {
+				if($token.Value -eq '.macro') {		### Should be implemented as .macro wrapper function?
 					$this.AddToken("function")
 				} else {
 					$this.AddToken($token.Value)
@@ -293,12 +378,23 @@ class Parser {
 
 				$addressingMode = [MOS6502AddressingMode]$state.ToString()
 				$this.AddToken(" -AddressingMode $($addressingMode) -Operand (")
-				foreach($i in $operandTokensIndex) {
-					$null = $this.ParseToken($i)
+
+				# write-Host $operandTokensIndex
+				# foreach ($t in $operandTokensIndex) {
+				# 	write-host $this.inTokens[$t].Type, $this.inTokens[$t].Value
+				# }
+				for($i=0;$i -lt $operandTokensIndex.Count;$i++) {
+					$ti = $this.ParseToken($operandTokensIndex[$i])
+					while($i -lt $operandTokensIndex.Count -and $ti -ge $operandTokensIndex[$i+1]) {$i++}
 				}
 				$this.AddToken(")")
 				$tokenIndex = $instEndIndex-1
 
+			}
+
+			([TokenType]::EOF) {
+				$this.scopeManager.ExitScope()
+				$this.AddToken($token.Value)
 			}
 
 			default {

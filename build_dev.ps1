@@ -1,7 +1,8 @@
 param(
-    [string]$ModuleName = 'PASM'
+    [string]$ModuleName = 'PASM',
+    [switch]$debug
 )
-
+write-host "DEBUG: $debug"
 $SourcePath = Join-Path -Path (Resolve-Path ./src) -ChildPath $ModuleName
 $ModulePath = Join-Path -Path $SourcePath -ChildPath "$ModuleName.psm1"
 
@@ -16,7 +17,9 @@ $config.CodeCoverage.Enabled = $false
 $config.Output.Verbosity = "Normal"
 $config.Output.Verbosity = "Detailed"
 # $config.Output.Verbosity = "Diagnostic"
-Invoke-Pester -Configuration $config
+if (-not $debug) {
+    Invoke-Pester -Configuration $config
+}
 
 Import-Module -Name $ModulePath -Force -Verbose
 Write-Host "✅ Development module loaded from: $SourcePath" -ForegroundColor Cyan

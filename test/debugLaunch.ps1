@@ -1,12 +1,12 @@
-. .\build_dev.ps1
+. .\build_dev.ps1 #-debug
 
-$res = Invoke-Assembler -SourceFile ".\test\SpriteDemo.s" -OutFile .\output\SpriteDemo.prg
+# $res = Invoke-Assembler -SourceFile ".\test\SpriteDemo.s" -OutFile .\output\SpriteDemo.prg
 # $res = 'nop' | Invoke-Assembler -ListAssembly -ListBinary
 # $res = 'lab: lda lab; lda #:$ff; inc :-;rts' | Invoke-Assembler -NoHostOutput
 # $res = '.text "ABCabc",0 -AsPETSCII:$false' | Invoke-Assembler -NoHostOutput
 # $res = Invoke-Assembler -SourceFile ".\test\demo.s" -NoHostOutput
-# $res = Invoke-Assembler -SourceFile ".\test\debug.s" -NoHostOutput
 # $res = 'jmp*' | Invoke-Assembler -ListAssembly -ListBinary
+$res = Invoke-Assembler -SourceFile ".\test\debug.s" -ListAssembly -ListBinary
 
 # Write-Host "AssemblyList:" -ForegroundColor Yellow
 # Write-Host "$($res.AssemblyList)"

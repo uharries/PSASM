@@ -168,6 +168,27 @@ Describe 'Invoke-Assembler Function' {
 		}
 	}
 
+	Context 'AssemblerPCTracking' {
+		It 'Returns expected <binary> from <code>' -TestCases @(
+			@{ code = 'for($i=0;$i -lt 3;$i++) {lda :+; :}; lda :+; :'; binary = @(0,0,0xa5,2,0xa5,4,0xa5,6,0xa5,8)}
+			@{ code = '.macro mac {lda :+; :}; mac; mac; mac'; binary = @(0,0,0xa5,2,0xa5,4,0xa5,6)}
+			@{ code = '.macro mac{:;lda :+;:};mac'; binary = @(0,0,0xa5,2)}		# adding a label in front, results in first instance resolving to 0... what? ..somthing wrong with the fwd resolver...
+
+		) {
+			($code | Invoke-Assembler -NoHostOutput).Binary | Should -Be $binary
+		}
+	}
+
+	Context 'ScopeTracking' {
+		It 'Returns expected <binary> from <code>' -TestCases @(
+			@{ code = '.macro mac($addr=mac.end) {lda $addr;end:}; mac'; binary = @(0,0,0xa5,2)}
+			@{ code = '.macro hest(){nop;lab:};hest;lda hest.lab'; binary = @(0,0,0xea,0xa5,1)}
+		) {
+			($code | Invoke-Assembler -NoHostOutput).Binary | Should -Be $binary
+		}
+	}
+
+
 	AfterAll {
 		Remove-Item -Path $testSourceFile, $testPSOutFile, $testOutFile -Force
 	}

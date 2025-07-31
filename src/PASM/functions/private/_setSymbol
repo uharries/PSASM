@@ -1,0 +1,9 @@
+function _setSymbol {
+	[PASM(noSymbolSupport)] param (
+		[Parameter(Mandatory)]
+		[string]$name,
+		[UInt16]$value = $pasm.pc,
+		[int]$instance = 0
+	)
+	return [byte]($value -band 0x00ff)
+}

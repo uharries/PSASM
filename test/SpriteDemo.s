@@ -20,12 +20,12 @@
 *** MACROS ********************************************************************
 \*****************************************************************************/
 
-.macro BasicPrgHeader($Address=:++, $BasicLineNumber=(Get-Date).Year) {
+.macro BasicPrgHeader($Address=BasicPrgHeader.end, $BasicLineNumber=(Get-Date).Year) {
 	.pc $0801
 	.word	:+, $BasicLineNumber		// Link to next BASIC Line
 	.text	$9e, ($Address).ToString(), 0	// SYS, Textual representation of addr, end of BASIC line
 :	.word	0				// BASIC end marker
-:
+end:
 }
 
 .macro IDisable() {
@@ -52,7 +52,7 @@
 	sta	$fffe
 	lda	$d011
 	and	#$7f
-	ora	#>$scanLine
+	ora	#>$scanLine  //this is clearly wrong.. should be >($scanLine -shl 7), no??!
 	sta	$d011
 	lda	#<$scanLine
 	sta	$d012

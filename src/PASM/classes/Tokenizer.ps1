@@ -192,8 +192,19 @@ class Tokenizer {
 	}
 
 	[Token] ScanMember() {
-		while($this.GetChar() -in $script:CharsIdentifier) {}
-		$this.UnGetChar()
+		if ($this.GetChar() -eq ':') {
+			$c = $this.PeekChar()
+			if ($c -in '+','-') {
+				while($this.GetChar() -eq $c) {}
+				$this.UnGetChar()
+				if($this.PeekChar() -in ([char[]]'$' + $script:CharsIdentifier)) {
+					$this.UnGetChar()
+				}
+			}
+		} else {
+			while($this.GetChar() -in $script:CharsIdentifier) {}
+			$this.UnGetChar()
+		}
 		return $this.NewToken([TokenType]::Member)
 	}
 
@@ -284,7 +295,7 @@ class Tokenizer {
 				return $this.NewToken([TokenType]::SemiColon)
 			}
 			'.' {
-				if($this.PeekChar() -match '[_a-z]') {
+				if($this.PeekChar() -match '[_a-z:]') {
 					if($this.tokens[-1].Type -in [TokenType]::WhiteSpace, [TokenType]::NewLine, [TokenType]::SemiColon, $null) {
 						return $this.ScanDirective()
 					}
@@ -301,7 +312,6 @@ class Tokenizer {
 				if($c1 -eq '+' -or $c1 -eq '-') {
 					while($this.GetChar() -eq $c1) {}
 					$this.UnGetChar()
-					$ccc = $this.PeekChar()
 					if($this.PeekChar() -in ([char[]]'$' + $script:CharsIdentifier)) {
 						$this.UnGetChar()
 					}
@@ -348,6 +358,7 @@ class Tokenizer {
 		while($this.PeekChar() -ne 0) {
 			$this.tokens.Add($this.NextToken())
 		}
-		$this.tokens.Add([Token]::new([TokenType]::EOF, $null, $this.cpos, 0, $null, $null))
+		$this.tokenStart = $this.cpos++
+		$this.tokens.Add($this.NewToken([TokenType]::EOF))
 	}
 }
