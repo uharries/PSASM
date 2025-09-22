@@ -187,7 +187,7 @@ class PASM {
 			Success = $true
 			LoadAddress = $this.loadAddress
 			Scopes = $this.scopes
-			Symbols = $this.symbolManager.Symbols
+			Symbols = $this.symbolManager.GetSymbolTable()
 			PSSource = $this.psSource | Out-String
 			Assembly = $this.assembly
 			AssemblyList = $this.ListAssembly()

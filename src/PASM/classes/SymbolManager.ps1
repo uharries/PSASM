@@ -120,63 +120,6 @@ class SymbolManager {
 	}
 
 
-	[void] GetSymbolFq($name, [int]$scopeId, [System.Management.Automation.InvocationInfo]$invocation) {
-		$names=$name.Split('.')
-		$CallerScopeId = $scopeId
-		foreach ($n in $names) {
-			$scopeId = $this.scopes.Where({$_.ParentId -eq $scopeId -and $_.Name -eq $n}).Id
-		}
-
-	}
-
-
-
-    [UInt16] GetSymbol3([string]$name, [int]$scopeId, [System.Management.Automation.InvocationInfo]$invocation) {
-		$invocationKey = "$($invocation.ScriptLineNumber):$($invocation.OffsetInLine)"
-        write-host "IK: $($invocationKey)"
-		if (-not $this.Symbols.ContainsKey($scopeID)) {
-			write-host "Value1: NULL"
-			return $null
-		}
-		if (-not $this.Symbols[$scopeID].ContainsKey($name)) {
-			write-host "Value2: NULL"
-			return $null
-		}
-		$entry = $this.Symbols[$scopeID][$name]
-		$values = $entry.Values
-		if (-not $this.InvocationTracker.ContainsKey($invocationKey)) {
-			$this.InvocationTracker[$invocationKey] = 0
-		}
-		$i = $this.InvocationTracker[$invocationKey]
-		$this.InvocationTracker[$invocationKey]++
-
-		if ($i -ge $values.Count) {
-			write-host "Value3: NULL"
-			return $null
-		}
-
-		write-host "Value: $($values[$i])"
-		return $values[$i]
-	}
-
-    [UInt16] GetSymbol2([string]$name, [int]$scopeId, [System.Management.Automation.InvocationInfo]$invocation) {
-        $invocationKey = @{Line = $invocation.ScriptLineNumber; Column = $invocation.OffsetInLine}
-        write-host "L: $($invocationKey['Line']), C: $($invocationKey['Column'])"
-		$sym = $this.Symbols[$scopeId][$name]
-		$val = $sym.Values[$sym.Values.Count - 1]
-		if($sym.Line -gt $invocationKey['Line'] -or ($sym.Line -eq $invocationKey['Line'] -and $sym.Column -gt $invocationKey['Column'])) {
-			### Label is defined after the invocation, so get second to last instance
-			write-host "HEINZ!"
-			$val = $sym.Values[$sym.Values.Count - 2]
-		}
-        # if (-not $this.TestSymbol($name, $scopeId)) {
-		# 	$this.AddUnresolvedSymbol($name,$scopeId,0,0)
-        # }
-		write-host "Value: $val"
-        return $val
-		# throw "Symbol '$name' was not found in current " <#or any parent #> + "scope."
-    }
-
     [boolean] TestSymbol([string]$name, [int]$scopeId) {
 		$names=$name.Split('.')
 		foreach ($n in $names) {
@@ -197,15 +140,18 @@ class SymbolManager {
         }
     }
 
-    [void] SetSymbol2([string]$name, [int]$scopeId, [int]$value, [int]$width) {
-        if ($this.Symbols.ContainsKey($scopeId) -and $this.Symbols[$scopeId].ContainsKey($name)) {
-            $this.Symbols[$scopeId][$name].Values.Add($value)
-            $this.Symbols[$scopeId][$name].Width = $width
-            $this.Symbols[$scopeId][$name].Resolved = $true
-        }
-        else {
-            throw "Symbol '$name' not found (this shouldn't happen)."
-        }
-    }
+	[object[]] GetSymbolTable() {
+		$table = foreach ($scopeId in $this.Symbols[$this.CurrentPass].Keys) {
+			foreach ($name in $this.Symbols[$this.CurrentPass][$scopeId].Keys) {
+				$sym = $this.Symbols[$this.CurrentPass][$scopeId][$name][-1]
+				[pscustomobject]@{
+					Scope    = $scopeId
+					Name     = $name
+					Value    = $sym.value
+				}
+			}
+		}
+		return $table
+	}
 
 }

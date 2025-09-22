@@ -2,7 +2,7 @@ class AssemblerInformation {
 	[bool]$Success
 	[UInt16]$LoadAddress
 	[Scope[]]$Scopes
-	[hashtable]$Symbols
+	[object[]]$Symbols
 	[string]$PSSource
 	[array]$SourceMap
 	[array]$Assembly

@@ -36,6 +36,10 @@ Since I am trying to retrofit 6502 assembly onto the PowerShell engine, there ar
 
 ## Building / Installing
 There is no fancy installer yet, nor is it available on PowerShell Gallery, so you have to clone the repo and run the build script `PASM.Build.ps1`.
+I may be using new features of PowerShell, so make sure to install the latest version, see: https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-windows?view=powershell-7.5
+Short version:
+- `winget install --id Microsoft.PowerShell --source winget`
+
 The build script requires Pester version 5 or greater, so make sure to install that first.
 You can install the latest version of Pester by running:
 

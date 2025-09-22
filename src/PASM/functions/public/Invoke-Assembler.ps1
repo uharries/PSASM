@@ -73,6 +73,10 @@ function Invoke-Assembler {
 		[Alias("O","Output")]
 		[string]$OutFile,
 
+		[Parameter()]
+		[Alias("lbl")]
+		[string]$LabelFile = "$($SourceFile -replace '(.*)([.].*)','$1').lbl",
+
 		[Alias("ps","psfile")]
 		[string]$DumpPSfile,
 
@@ -139,6 +143,12 @@ function Invoke-Assembler {
 			$asmInfo.Binary | set-content -asbytestream -path $OutFile -Force
 			if (-not $NoHostOutput) {
 				Write-Host ("File Hash: {0:x}" -f ((Get-FileHash -Algorithm SHA256 $OutFile).Hash))
+			}
+			if ($LabelFile) {
+				if (-not(Test-Path -Path $LabelFile)) {
+					New-Item -Path $LabelFile -Force
+				}
+				$asmInfo.symbols.ForEach({"al {0:x6} .{1}" -f $_.Value, $_.Name}) | set-content -path $LabelFile -Force
 			}
 		}
 
