@@ -12,7 +12,7 @@ function .label {
 
 	$width = $addr -ge 256 ? 16 : 8
 	# write-host "`nGetSymbol($name,$scopeId)"
-	$oldSym = $pasm.symbolManager.GetSymbol($name, $scopeId, $MyInvocation)
+	$oldSym = $pasm.symbolManager.GetSymbol($name, $scopeId, 0,0, $MyInvocation)
 	# write-host "Name: $($oldSym.Name)"
 	# write-host "Value: $($oldSym.Value)"
 	# write-host "Width: $($oldSym.Width)"

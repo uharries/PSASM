@@ -11,18 +11,20 @@ if (-Not (Test-Path -Path $OutputPath)) {
 }
 
 # Get the latest Git commit hash or use date if Git is not available
-try {
-    $Version = git describe --tags --abbrev=0
-} catch {
-    # If Git is not available, fall back to the current date for versioning
-    $Version = (Get-Date).ToString('yyyyMMdd.HHmm')
-}
+# try {
+#     $Version = git describe --tags --abbrev=0
+# } catch {
+#     # If Git is not available, fall back to the current date for versioning
+#     $Version = (Get-Date).ToString('yyyyMMdd.HHmm')
+# }
 
+$Version = (Get-Date).ToString('yyyyMMdd.HHmm')
 Write-Host "Version: $Version" -ForegroundColor Cyan
 
 # Copy module source into output
 $ModuleSource = Join-Path -Path $SourcePath -ChildPath $ModuleName
 $Destination = Join-Path -Path $OutputPath -ChildPath $ModuleName
+Remove-Item -Path $Destination -Recurse -Force
 
 Copy-Item -Path $ModuleSource -Destination $Destination -Recurse -Force
 
@@ -46,7 +48,7 @@ $Psd1Path = Join-Path -Path $Destination -ChildPath "$ModuleName.psd1"
 $Psd1Content = Get-Content -Path $Psd1Path -Raw
 
 # Replace the version string in the .psd1 file
-$Psd1Content = $Psd1Content -replace '(\$ModuleVersion\s*=\s*).+', "`$ModuleVersion = '$Version'"
+$Psd1Content = $Psd1Content -replace '(ModuleVersion\s*=\s*).+', "ModuleVersion = '$Version'"
 
 # Write the updated content back to the .psd1 file
 $Psd1Content | Set-Content -Path $Psd1Path -Force

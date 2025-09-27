@@ -174,7 +174,7 @@ class SemanticParser {
 
 			([TokenType]::AnonymousReference) {
 				# if($this.symbolManager.TestSymbol($token.Value, $this.scopeManager.GetCurrentScope())) {
-					$this.AddToken("`(_getSymbol '$($token.Value)' $($this.scopeManager.GetCurrentScope()))")
+					$this.AddToken("`(_getSymbol '$($token.Value)' $($this.scopeManager.GetCurrentScope()) $($token.Line) $($token.Column))")
 					# $this.AddToken("`$script:__SYM_$($token.Value)")
 				# } else {
 					# $this.AddToken($token.Value)
@@ -189,7 +189,7 @@ class SemanticParser {
 					$tval += $this.inTokens[$ti].Value
 				}
 				if($this.symbolManager.TestSymbol($tval, $this.scopeManager.GetCurrentScope())) {
-					$this.AddToken("`(_getSymbol '$($tval)' $($this.scopeManager.GetCurrentScope()))")
+					$this.AddToken("`(_getSymbol '$($tval)' $($this.scopeManager.GetCurrentScope()) $($token.Line) $($token.Column))")
 					$tokenIndex = $ti
 				} else {
 					$this.AddToken($token.Value)

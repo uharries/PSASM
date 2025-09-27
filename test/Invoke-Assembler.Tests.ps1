@@ -172,7 +172,9 @@ Describe 'Invoke-Assembler Function' {
 		It 'Returns expected <binary> from <code>' -TestCases @(
 			@{ code = 'for($i=0;$i -lt 3;$i++) {lda :+; :}; lda :+; :'; binary = @(0,0,0xa5,2,0xa5,4,0xa5,6,0xa5,8)}
 			@{ code = '.macro mac {lda :+; :}; mac; mac; mac'; binary = @(0,0,0xa5,2,0xa5,4,0xa5,6)}
+			@{ code = '.macro mac {:lda :-; :}; mac; mac; mac'; binary = @(0,0,0xa5,0,0xa5,2,0xa5,4)}
 			@{ code = '.macro mac{:;lda :+;:};mac'; binary = @(0,0,0xa5,2)}		# adding a label in front, results in first instance resolving to 0... what? ..somthing wrong with the fwd resolver...
+			@{ code = '.macro mac(){:lda :-;};.macro mac2(){mac};mac2;mac2;mac2'; binary = @(0,0,0xa5,0,0xa5,2,0xa5,4)}	#calling macros calling macros with labels were an issue...
 
 		) {
 			($code | Invoke-Assembler -NoHostOutput).Binary | Should -Be $binary

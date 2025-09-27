@@ -41,7 +41,7 @@ class SymbolManager {
 	}
 
 
-	[SymbolEntry] GetSymbol($name, [int]$scopeId, [System.Management.Automation.InvocationInfo]$invocation) {
+	[SymbolEntry] GetSymbol($name, [int]$scopeId, [int]$callerLine, [int]$callerColumn, [System.Management.Automation.InvocationInfo]$invocation) {
 		$names = $name.Split('.')
 		$nameIsQualified = $names.count -gt 1 ? $true : $false
 
@@ -95,7 +95,12 @@ class SymbolManager {
 								$numCurrentInstances = $this.Symbols[$currPass][$scope][$name].Count
 								$currentInstance = $numCurrentInstances - 1
 								if ($numCurrentInstances -lt $numPreviousInstances) {
-									return $this.Symbols[$previousPass][$scope][$name][$currentInstance+1]
+									if ($callerLine -lt $this.Symbols[$currPass][$scope][$name][$currentInstance].Line -or ($callerLine -eq $this.Symbols[$currPass][$scope][$name][$currentInstance].Line -and $callerColumn -lt $this.Symbols[$currPass][$scope][$name][$currentInstance].Column)) {
+										### For forward references
+										return $this.Symbols[$previousPass][$scope][$name][$currentInstance+1]
+									}
+										### For backward references
+										return $this.Symbols[$currPass][$scope][$name][$currentInstance]
 								} else {
 									return $this.Symbols[$currPass][$scope][$name][$currentInstance]
 								}
@@ -109,10 +114,10 @@ class SymbolManager {
 						return $this.Symbols[$previousPass][$scope][$name][0]
 					}
 				} else {
-					throw "Unresolved symbol in scope '$scope'. Symbol '$name' not found in line $($line), column $($column)"
+					throw "Unresolved symbol in scope '$scope'. Symbol '$name' not found in line $($callerLine), column $($callerColumn)"
 				}
 			} else {
-				throw "Unresolved symbol '$name'. Scope '$scope' not found in line $($line), column $($column)"
+				throw "Unresolved symbol '$name'. Scope '$scope' not found in line $($callerLine), column $($callerColumn)"
 			}
 		} else {
 			return [SymbolEntry]::new()
