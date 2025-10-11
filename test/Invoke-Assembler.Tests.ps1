@@ -168,6 +168,17 @@ Describe 'Invoke-Assembler Function' {
 		}
 	}
 
+	Context 'Directives' {
+		It 'Returns expected <binary> from <code>' -TestCases @(
+			@{ code = '.mac mac($x) {lda #$x;};mac(2);mac (4)'; binary = @(0,0,0xa9,2,0xa9,4)}
+			@{ code = '.mac mac() {nop;};mac;mac();mac ();mac(  );mac ( )'; binary = @(0,0,0xea,0xea,0xea,0xea,0xea)}
+			@{ code = 'class c{c(){}}'; binary = @(0,0)}	# ensure @() patch does not apply to classes
+		) {
+			($code | Invoke-Assembler -NoHostOutput).Binary | Should -Be $binary
+		}
+	}
+
+
 	Context 'AssemblerPCTracking' {
 		It 'Returns expected <binary> from <code>' -TestCases @(
 			@{ code = 'for($i=0;$i -lt 3;$i++) {lda :+; :}; lda :+; :'; binary = @(0,0,0xa5,2,0xa5,4,0xa5,6,0xa5,8)}
@@ -175,7 +186,7 @@ Describe 'Invoke-Assembler Function' {
 			@{ code = '.macro mac {:lda :-; :}; mac; mac; mac'; binary = @(0,0,0xa5,0,0xa5,2,0xa5,4)}
 			@{ code = '.macro mac{:;lda :+;:};mac'; binary = @(0,0,0xa5,2)}		# adding a label in front, results in first instance resolving to 0... what? ..somthing wrong with the fwd resolver...
 			@{ code = '.macro mac(){:lda :-;};.macro mac2(){mac};mac2;mac2;mac2'; binary = @(0,0,0xa5,0,0xa5,2,0xa5,4)}	#calling macros calling macros with labels were an issue...
-
+			@{ code = '.macro mac($addr=mac.end, $x) {lda $addr;end:};mac(254)'; binary = @(0,0,0xa5,0xfe)}
 		) {
 			($code | Invoke-Assembler -NoHostOutput).Binary | Should -Be $binary
 		}

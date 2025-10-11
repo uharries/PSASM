@@ -76,17 +76,21 @@ class SymbolManager {
 		### In this case previousPass is pass 0, and Pass 0 should add all labels
 		if ($currPass -le 1) {
 			if ($this.Symbols[0][$scope] -and $this.Symbols[0][$scope][$name]) {
+				# write-host "Symbol '$name' found in scope '$scope' in pass 0: val: $($this.Symbols[0][$scope][$name][-1].Value)"
 				return $this.Symbols[0][$scope][$name][-1]
 			}
 		}
 
-		if ($previousPass -ge 0) {
-			# Write-Host "NUMPASSES $numPasses CurrentPass $currentPass PREV PASS: $previousPass"
-			# Write-Host $this.Symbols.Count
-			# Write-Host $this.Symbols[$previousPass-1]
-			# Write-Host $this.Symbols[$previousPass]
-			# Write-Host $this.Symbols
-			if ($this.Symbols[$previousPass][$scope]) {
+		if ($this.CurrentPass -gt 1) {
+			# Write-Host "NUMPASSES $numPasses CurrentPass $($this.currentPass) PREV PASS: $previousPass"
+			# Write-Host "Symbol Count: $($this.Symbols.Count)"
+			# Write-Host "Scope: $scope"
+			# foreach ($e in $this.GetSymbolTable() ) {
+			# 	Write-Host "SYMBOL: $($e.Scope).$($e.Name) = $($e.Value)"
+			# }
+
+			# Write-Host ($this.GetSymbolTable | %{$_ |Out-String})
+			if ($this.Symbols[$previousPass]?[$scope]) {
 				if ($this.Symbols[$previousPass][$scope][$name]) {
 					$numPreviousInstances = $this.Symbols[$previousPass][$scope][$name].Count
 					if ($this.Symbols[$currPass]) {
@@ -117,7 +121,8 @@ class SymbolManager {
 					throw "Unresolved symbol in scope '$scope'. Symbol '$name' not found in line $($callerLine), column $($callerColumn)"
 				}
 			} else {
-				throw "Unresolved symbol '$name'. Scope '$scope' not found in line $($callerLine), column $($callerColumn)"
+				return [SymbolEntry]::new()
+				# throw "Unresolved symbol '$name'. Scope '$scope' not found in line $($callerLine), column $($callerColumn)"
 			}
 		} else {
 			return [SymbolEntry]::new()

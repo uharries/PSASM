@@ -1,4 +1,4 @@
-. .\build_dev.ps1 #-debug
+. .\build_dev.ps1 -debug
 
 # $res = Invoke-Assembler -SourceFile ".\test\SpriteDemo.s" -OutFile .\output\SpriteDemo.prg
 # $res = 'nop' | Invoke-Assembler -ListAssembly -ListBinary

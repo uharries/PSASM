@@ -4,6 +4,7 @@ class SemanticParser {
 	[System.Collections.Generic.List[object]]$outTokens
 	[SymbolManager]$symbolManager
 	[ScopeManager]$scopeManager
+	[System.Collections.Generic.List[object]]$Macros
 
 	SemanticParser([string]$InputData) {
 		$this.t = [Tokenizer]::new($InputData)
@@ -11,8 +12,10 @@ class SemanticParser {
 		$this.inTokens = $this.t.tokens
 		$this.outTokens = [System.Collections.Generic.List[Token]]::new()
 		$this.scopeManager = [ScopeManager]::new()
+		$this.Macros = [System.Collections.Generic.List[string]]::new()
 		$this.MapSymbols()
 		$this.MapScopes()
+		$this.MapMacros()
 		$this.ParseTokens(0, $this.inTokens.Count)
 	}
 
@@ -123,6 +126,23 @@ class SemanticParser {
 		$this.symbolManager.scopes = $this.scopeManager.scopes
 	}
 
+	[void] MapMacros() {
+		for ($tokenIndex = 0; $tokenindex -lt $this.inTokens.Count; $tokenIndex++) {
+		    $token = $this.inTokens[$tokenIndex]
+		    switch($token.Type) {
+		        ([TokenType]::Directive) {
+		            if ($token.Value -match '\.mac(ro)?') {
+		                $j = 1
+		                while ($this.inTokens[$tokenIndex+$j].Type -eq [TokenType]::WhiteSpace) {$j++}
+		                if ($this.inTokens[$tokenIndex+$j].Type -eq [TokenType]::Identifier) {
+		                    $this.Macros.Add($this.inTokens[$tokenIndex+$j].Value)
+		                }
+		            }
+		        }
+		    }
+		}
+	}
+
 
 	[int] ParseToken([int]$tokenIndex) {
 		$token = $this.inTokens[$tokenIndex]
@@ -174,7 +194,8 @@ class SemanticParser {
 
 			([TokenType]::AnonymousReference) {
 				# if($this.symbolManager.TestSymbol($token.Value, $this.scopeManager.GetCurrentScope())) {
-					$this.AddToken("`(_getSymbol '$($token.Value)' $($this.scopeManager.GetCurrentScope()) $($token.Line) $($token.Column))")
+					# write-host "AnonymousReference __getSymbol()"
+					$this.AddToken(" (_getSymbol '$($token.Value)' $($this.scopeManager.GetCurrentScope()) $($token.Line) $($token.Column))")
 					# $this.AddToken("`$script:__SYM_$($token.Value)")
 				# } else {
 					# $this.AddToken($token.Value)
@@ -189,7 +210,9 @@ class SemanticParser {
 					$tval += $this.inTokens[$ti].Value
 				}
 				if($this.symbolManager.TestSymbol($tval, $this.scopeManager.GetCurrentScope())) {
-					$this.AddToken("`(_getSymbol '$($tval)' $($this.scopeManager.GetCurrentScope()) $($token.Line) $($token.Column))")
+					# $this.AddToken("`(_getSymbol '$($tval)' $($this.scopeManager.GetCurrentScope()) $($token.Line) $($token.Column))")
+					# write-host "Identifier __getSymbol()"
+					$this.AddToken(' (_getSymbol "'+$($tval)+'" '+$($this.scopeManager.GetCurrentScope())+' '+$($token.Line)+' '+$($token.Column)+')')
 					$tokenIndex = $ti
 				} else {
 					$this.AddToken($token.Value)
@@ -244,6 +267,33 @@ class SemanticParser {
 				$this.AddToken($token.Value)
 			}
 
+			([TokenType]::LParen) {
+				$i = $tokenIndex+1
+				while($this.inTokens[$i].Type -eq [TokenType]::WhiteSpace) {
+					$i++
+				}
+				if ($this.inTokens[$i].Type -eq [TokenType]::RParen) {
+					$i = $tokenIndex-1
+					while($this.inTokens[$i].Type -eq [TokenType]::WhiteSpace) {
+						$i--
+					}
+					if ($this.inTokens[$i].Value -in $this.Macros) {
+						$this.AddToken(" @")
+					} elseif ($this.inTokens[$i].Type -eq [TokenType]::Identifier) {
+						$i--
+						while($this.inTokens[$i].Type -eq [TokenType]::WhiteSpace) {
+							$i--
+						}
+						if ($this.inTokens[$i].Type -eq [TokenType]::Directive) {
+							if ($this.inTokens[$i].Value -match '\.mac(ro)?') {
+								$this.AddToken(" @")
+							}
+						}
+					}
+				}
+				$this.AddToken($token.Value)
+			}
+
 			([TokenType]::Asterisk) {
 				$match = $false
 				$j=1
@@ -271,14 +321,6 @@ class SemanticParser {
 					}
 				}
 				if(-not $match) {
-					$this.AddToken($token.Value)
-				}
-			}
-
-			([TokenType]::Directive) {
-				if($token.Value -eq '.macro') {		### Should be implemented as .macro wrapper function?
-					$this.AddToken("function")
-				} else {
 					$this.AddToken($token.Value)
 				}
 			}

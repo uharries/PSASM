@@ -31,7 +31,9 @@ function Get-PASMFunction {
 	param (
 		[string]$FunctionName = '*',
 
-		[switch]$OnlySymbolSupport
+		[switch]$OnlySymbolSupport,
+
+		[switch]$ListMacros
 	)
 
 	$res = (get-command -Type Function,Alias).Where({
@@ -39,10 +41,17 @@ function Get-PASMFunction {
 		($_.ResolvedCommand.ScriptBlock.Ast.Body.ParamBlock.Attributes.TypeName.Name -eq "PASM")
 	})
 
-	if($OnlySymbolSupport) {
+	if ($OnlySymbolSupport) {
 		$res = $res.Where({
 			($_.ScriptBlock.Ast.Body.ParamBlock.Attributes.NamedArguments.ArgumentName -notmatch 'noSymbolSupport') -and
 			($_.ResolvedCommand.ScriptBlock.Ast.Body.ParamBlock.Attributes.NamedArguments.ArgumentName -notmatch 'noSymbolSupport')
+		})
+	} elseif ($ListMacros) {
+		$res = (get-command -Type Function,Alias).Where({
+			($_.ScriptBlock.Ast.ParamBlock.Attributes.TypeName.Name -eq "PASM" -and $_.Name -like $FunctionName)
+		})
+		$res = $res.Where({
+			($_.ScriptBlock.Ast.ParamBlock.Attributes.NamedArguments.ArgumentName -match 'macro')
 		})
 	}
 

@@ -1,11 +1,15 @@
+# Using module PSScriptAnalyzer
+
 param(
     [string]$ModuleName = 'PASM',
     [switch]$debug
 )
 write-host "DEBUG: $debug"
 $SourcePath = Join-Path -Path (Resolve-Path ./src) -ChildPath $ModuleName
-$ModulePath = Join-Path -Path $SourcePath -ChildPath "$ModuleName.psm1"
+$ModulePath = (Resolve-Path(Join-Path -Path $SourcePath -ChildPath "$ModuleName.psm1")).Path
 
+Install-PSResource -Name PSScriptAnalyzer
+Import-Module PSScriptAnalyzer
 Invoke-ScriptAnalyzer -Path $ModulePath -Settings PSScriptAnalyzerSettings.psd1 -IncludeDefaultRules -Verbose:$false
 
 Import-Module Pester
@@ -21,6 +25,14 @@ if (-not $debug) {
     Invoke-Pester -Configuration $config
 }
 
-Import-Module -Name $ModulePath -Force -Verbose
+if (get-module $ModuleName) {
+    $macros = Get-PASMFunction -ListMacros
+    if ($macros) {
+        $macros | %{if (Test-Path "Function:\$_") { Remove-Item "Function:\$_" -Force }}
+    }
+}
+Remove-Module $ModuleName -Force -ErrorAction SilentlyContinue
+Import-Module $ModulePath -Force -Verbose
+
 Write-Host "✅ Development module loaded from: $SourcePath" -ForegroundColor Cyan
 

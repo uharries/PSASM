@@ -87,6 +87,7 @@ class PASM {
 	[SemanticParser]Parse() {
 		$this.parser = [SemanticParser]::new($this.asmSource)
 		$this.psSource = $this.parser.outTokens.value -join ''
+		# write-host $this.psSource
 		$this.scopes = $this.parser.scopeManager.scopes
 		$this.symbolManager = $this.parser.symbolManager
 		$this.symbolManager.CurrentPass = $this.CurrentPass
@@ -116,6 +117,9 @@ class PASM {
 			} catch {
 				if(-not $this.NoHostOutput) {
 					Write-Host " FAILED!"
+					Write-Host "Error in parsing generated PowerShell source code!"
+					Write-Host $this.psSource
+					Write-Host "SymbolTable: $($this.symbolManager.GetSymbolTable() | ft -auto | out-string)"
 				}
 				throw $_
 				# throw [System.Exception]::new(("Error in psSource line {0}, column {1}: {2}: {3} '{4}'" -f
@@ -136,6 +140,9 @@ class PASM {
 				if ($psError) {
 					if(-not $this.NoHostOutput) {
 						Write-Host " FAILED!"
+						Write-Host "Error in executing generated PowerShell source code!"
+						Write-Host $this.psSource
+						Write-Host "SymbolTable: $($this.symbolManager.GetSymbolTable() | ft -auto | out-string)"
 					}
 					throw $_
 					# throw [System.Exception]::new(("Error in psSource line {0}, column {1}: {2} '{3}'" -f $psError[0].InvocationInfo.ScriptLineNumber, $psError[0].InvocationInfo.OffsetInLine, $psError[0].CategoryInfo.Reason, $psError[0].CategoryInfo.TargetName))
