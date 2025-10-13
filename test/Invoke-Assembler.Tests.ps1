@@ -196,6 +196,7 @@ Describe 'Invoke-Assembler Function' {
 		It 'Returns expected <binary> from <code>' -TestCases @(
 			@{ code = '.macro mac($addr=mac.end) {lda $addr;end:}; mac'; binary = @(0,0,0xa5,2)}
 			@{ code = '.macro hest(){nop;lab:};hest;lda hest.lab'; binary = @(0,0,0xea,0xa5,1)}
+			@{ code = 'lab:{lab2=123;};lda lab.lab2'; binary = @(0,0,0xa5,0x7b)}
 		) {
 			($code | Invoke-Assembler -NoHostOutput).Binary | Should -Be $binary
 		}

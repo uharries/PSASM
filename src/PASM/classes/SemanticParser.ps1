@@ -43,6 +43,28 @@ class SemanticParser {
 		return $tokenIndex
 	}
 
+	[bool] IsNextToken([int]$tokenIndex, [TokenType]$tokenType) {
+		$i = $this.SkipWhitespace($tokenIndex + 1)
+		return $this.inTokens[$i].Type -eq $tokenType
+	}
+
+	[int] SkipToNextToken([int]$tokenIndex, [TokenType]$tokenType) {
+		while($this.inTokens[$tokenIndex].Type -ne $tokenType) {$tokenIndex++}
+		return $tokenIndex
+	}
+
+	[int] SkipToNextToken([int]$tokenIndex, [TokenType[]]$tokenTypes) {
+		while($this.inTokens[$tokenIndex].Type -notin $tokenTypes) {$tokenIndex++}
+		return $tokenIndex
+	}
+
+
+	[bool] IsPrevToken([int]$tokenIndex, [TokenType]$tokenType) {
+		$i = $this.SkipWhitespaceBackwards($tokenIndex - 1)
+		return $this.inTokens[$i].Type -eq $tokenType
+	}
+
+
 	hidden [int] LookBackForToken([int]$startIndex, [TokenType[]]$stopTypes, [TokenType[]]$matchTypes, [bool]$skipParenthesis) {
 		$i = 1
 		$depth = 0
@@ -145,6 +167,7 @@ class SemanticParser {
 
 
 	[int] ParseToken([int]$tokenIndex) {
+		$nextTokenIndex = $tokenIndex + 1
 		$token = $this.inTokens[$tokenIndex]
 		switch($token.Type) {
 			([TokenType]::Label) {
@@ -162,6 +185,9 @@ class SemanticParser {
 				if(-not $inInstr) {
 					$this.AddToken(".label -name $symbolName -scopeId $($this.scopeManager.GetCurrentScope());")
 					$this.symbolManager.AddUnresolvedSymbol($symbolName, $this.scopeManager.GetCurrentScope(), $token.Line, $token.Column)
+				}
+				if ($this.IsNextToken($tokenIndex, [TokenType]::LCurly)) {
+					$this.AddToken("&")
 				}
 			}
 
@@ -195,7 +221,7 @@ class SemanticParser {
 			([TokenType]::AnonymousReference) {
 				# if($this.symbolManager.TestSymbol($token.Value, $this.scopeManager.GetCurrentScope())) {
 					# write-host "AnonymousReference __getSymbol()"
-					$this.AddToken(" (_getSymbol '$($token.Value)' $($this.scopeManager.GetCurrentScope()) $($token.Line) $($token.Column))")
+					$this.AddToken("(_getSymbol '$($token.Value)' $($this.scopeManager.GetCurrentScope()) $($token.Line) $($token.Column))")
 					# $this.AddToken("`$script:__SYM_$($token.Value)")
 				# } else {
 					# $this.AddToken($token.Value)
@@ -205,15 +231,28 @@ class SemanticParser {
 			([TokenType]::Identifier) {
 				$tval = $token.Value
 				$ti = $tokenIndex
+				# Build qualified name if identifier has members (e.g. myLabel.part1.part2)
 				while ($this.inTokens[$ti+1].Type -eq [TokenType]::Member) {
 					$ti++
 					$tval += $this.inTokens[$ti].Value
 				}
+				# Check if next token is '=' (assignment) - if so, convert to .label call
+				if ($this.IsNextToken($ti, [TokenType]::Equals)) {
+					$this.symbolManager.AddUnresolvedSymbol($tval, $this.scopeManager.GetCurrentScope(), $token.Line, $token.Column)
+					$this.AddToken(".label -name $tval -scopeId $($this.scopeManager.GetCurrentScope()) -addr (")
+					# Skip the Equal sign
+					$ti = $this.SkipToNextToken($ti, [TokenType]::Equals) + 1
+					# Parse nested expression until semicolon or newline
+					while ($this.inTokens[$ti].Type -notin $null, [TokenType]::SemiColon, [TokenType]::NewLine) {$ti = $this.ParseToken($ti)}
+					$nextTokenIndex = $ti
+					$this.AddToken(");")
+					break
+				}
 				if($this.symbolManager.TestSymbol($tval, $this.scopeManager.GetCurrentScope())) {
 					# $this.AddToken("`(_getSymbol '$($tval)' $($this.scopeManager.GetCurrentScope()) $($token.Line) $($token.Column))")
 					# write-host "Identifier __getSymbol()"
-					$this.AddToken(' (_getSymbol "'+$($tval)+'" '+$($this.scopeManager.GetCurrentScope())+' '+$($token.Line)+' '+$($token.Column)+')')
-					$tokenIndex = $ti
+					$this.AddToken('(_getSymbol "'+$($tval)+'" '+$($this.scopeManager.GetCurrentScope())+' '+$($token.Line)+' '+$($token.Column)+')')
+					$nextTokenIndex = $ti+1
 				} else {
 					$this.AddToken($token.Value)
 				}
@@ -260,6 +299,10 @@ class SemanticParser {
 			([TokenType]::LCurly) {
 				$this.scopeManager.EnterScope($tokenIndex)
 				$this.AddToken($token.Value)
+				$ti = $tokenIndex+1
+				while ($this.inTokens[$ti].Type -notin $null, [TokenType]::RCurly) { $ti = $this.ParseToken($ti) }
+				$ti = $this.ParseToken($ti) # Parse the closing curly brace to avaoid stack backtracking in the while loop above
+				$nextTokenIndex = $ti
 			}
 
 			([TokenType]::RCurly) {
@@ -351,14 +394,16 @@ class SemanticParser {
 					$this.AddToken(" -AddressingMode $($addressingMode) -Operand (")
 					$tokenIndex = $this.ParseTokens($tokenIndex, $instEndIndex-$tokenIndex)
 					$this.AddToken(")")
-					return $tokenIndex-1
+					$nextTokenIndex = $tokenIndex
+					break
 				}
 
 				### Implied
 				if($mne -in 'ASL','CLC','CLD','CLI','CLV','DEX','DEY','INX','INY','LSR','NOP','PHA','PHP','PLA','PLP','ROL','ROR','RTI','RTS','SEC','SED','SEI','TAX','TAY','TSX','TXA','TXS','TYA') {
 					$addressingMode = [MOS6502AddressingMode]::Implied
 					$this.AddToken(" -AddressingMode $($addressingMode)")
-					return $tokenIndex-1
+					$nextTokenIndex = $tokenIndex
+					break
 				}
 
 				### Rest of the addressing modes
@@ -426,12 +471,11 @@ class SemanticParser {
 				# 	write-host $this.inTokens[$t].Type, $this.inTokens[$t].Value
 				# }
 				for($i=0;$i -lt $operandTokensIndex.Count;$i++) {
-					$ti = $this.ParseToken($operandTokensIndex[$i])
+					$ti = $this.ParseToken($operandTokensIndex[$i]) - 1
 					while($i -lt $operandTokensIndex.Count -and $ti -ge $operandTokensIndex[$i+1]) {$i++}
 				}
 				$this.AddToken(")")
-				$tokenIndex = $instEndIndex-1
-
+				$nextTokenIndex = $instEndIndex
 			}
 
 			([TokenType]::EOF) {
@@ -443,12 +487,12 @@ class SemanticParser {
 				$this.AddToken($token.Value)
 			}
 		}
-		return $tokenIndex
+		return $nextTokenIndex
 	}
 
 	[int] ParseTokens([int]$tokenIndex, [int]$count) {
 		for($i=0;$i -lt $count;$i++) {
-			$i = $this.ParseToken($tokenIndex+$i) - $tokenIndex
+			$i = $this.ParseToken($tokenIndex+$i) - $tokenIndex - 1
 		}
 		return $tokenIndex+$i
 	}

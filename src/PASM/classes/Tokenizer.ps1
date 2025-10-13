@@ -296,7 +296,7 @@ class Tokenizer {
 			}
 			'.' {
 				if($this.PeekChar() -match '[_a-z:]') {
-					if($this.tokens[-1].Type -in [TokenType]::WhiteSpace, [TokenType]::NewLine, [TokenType]::SemiColon, $null) {
+					if($this.tokens[-1].Type -in [TokenType]::WhiteSpace, [TokenType]::NewLine, [TokenType]::SemiColon, [TokenType]::LCurly, [TokenType]::LParen, $null) {
 						return $this.ScanDirective()
 					}
 					return $this.ScanMember()

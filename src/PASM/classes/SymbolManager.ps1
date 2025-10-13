@@ -164,4 +164,31 @@ class SymbolManager {
 		return $table
 	}
 
+	[object[]] GetFullSymbolTable() {
+		$table = foreach ($pass in $this.Symbols.Keys) {
+			foreach ($scope in $this.Symbols[$pass].Keys) {
+				foreach ($name in $this.Symbols[$pass][$scope].Keys) {
+					for ($instance=0; $instance -lt $this.Symbols[$pass][$scope][$name].Count; $instance++) {
+						$symbol = $this.Symbols[$pass][$scope][$name][$instance]
+						[PSCustomObject]@{
+							Pass      = $pass
+							Scope     = $scope
+							Name      = $name
+							Instance  = $instance
+							SymName   = $symbol.Name
+							SymScope  = $symbol.ScopeId
+							SymPass   = $symbol.Pass
+							Value     = $symbol.Value
+							Width     = $symbol.Width
+							Line      = $symbol.Line
+							Column    = $symbol.Column
+						}
+					}
+				}
+			}
+		}
+
+		return $table | sort Pass, Scope, Name, Instance | ft
+	}
+
 }
