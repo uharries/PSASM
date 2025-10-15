@@ -7,7 +7,9 @@ class Tokenizer {
 	# [System.Collections.Generic.List[Token]]$tokens
 	[System.Collections.Generic.List[Object]]$tokens # Apparently does not work properly when specifying the class...
 	# $tokens
-
+	[hashtable]$state = @{}
+	[System.Collections.Generic.Stack[int]]$ScopeStack
+	[MultiLevelCounter]$classCounter
 
 	Tokenizer([string]$InputData) {
 		[int]$l=1
@@ -16,6 +18,8 @@ class Tokenizer {
 		$this.cpos = 0
 		$this.tokenStart = 0
 		$this.tokens = [System.Collections.Generic.List[Token]]::new()
+		$this.ScopeStack = [System.Collections.Generic.Stack[int]]::new()
+		$this.classCounter = [MultiLevelCounter]::new(2)
 
 		for($i=0;$i -lt $InputData.Length;$i++) {
 			if($InputData[$i] -eq "`r") {
@@ -32,6 +36,18 @@ class Tokenizer {
 	}
 
 	Tokenizer() {}
+
+	[void] SetState([string]$key) {
+		$this.state[$key] = $true
+	}
+
+	[void] UnsetState([string]$key) {
+		$this.state[$key] = $false
+	}
+
+	[bool] GetState([string]$key) {
+		return [bool]$this.state[$key]
+	}
 
 	[string] PeekChars([int]$numChars) {
 		if($numChars -lt 0) {
@@ -88,8 +104,6 @@ class Tokenizer {
 	}
 
 	[Token] ScanDirective() {
-		while($this.GetChar() -match '[_a-z0-9]') {}
-		$this.UnGetChar()
 		return $this.NewToken([TokenType]::Directive)
 	}
 
@@ -146,15 +160,35 @@ class Tokenizer {
 			$this.SkipChar()
 			return $this.NewToken([TokenType]::PSFunctionParameter)
 		}
+		if ($this.classCounter.Counters[0] -gt 0 -and $this.classCounter.Counters[1] -eq 1) {
+			# We're in a class, only methods and properties allowed here.. not sure how to handle props yet ;-)
+			# This is necessary to avoid macros being misinterpreted as methods, when used in classes
+			# and classes can be nested, that's why the MultiLevelCounter class is used - 0: class level, 1: scope level - and methods only exist at scope level 1
+			return $this.NewToken([TokenType]::PSClassMethod)
+		}
 		if($this.PeekChar() -eq ':') {
 			$this.SkipChar()
 			return $this.NewToken([TokenType]::Label)
+		}
+		$str = $this.InputData[$this.tokenStart..($this.cpos-1)] -join ''
+		if(($str) -in $script:PSKeywords) {
+			return $this.ScanPSKeyword()
+		}
+		if(($str) -in $script:PASMFunctions) {
+			return $this.ScanDirective()
 		}
 		if(($this.InputData[$this.tokenStart..$this.cpos] -join '') -match '^(ADC|AND|ASL|BCC|BCS|BEQ|BIT|BMI|BNE|BPL|BRK|BVC|BVS|CLC|CLD|CLI|CLV|CMP|CPX|CPY|DEC|DEX|DEY|EOR|INC|INX|INY|JMP|JSR|LDA|LDX|LDY|LSR|NOP|ORA|PHA|PHP|PLA|PLP|ROL|ROR|RTI|RTS|SBC|SEC|SED|SEI|STA|STX|STY|TAX|TAY|TSX|TXA|TXS|TYA)\b' -and $this.tokens[-1].Type -ne [TokenType]::Minus) {
 			# return $this.ScanMnemonic()
 			return $this.NewToken([TokenType]::Mnemonic)
 		}
 		return $this.NewToken([TokenType]::Identifier)
+	}
+
+	[Token] ScanPSKeyword() {
+		switch(($this.InputData[$this.tokenStart..($this.cpos-1)] -join '')) {
+			"class" { $this.classCounter.Inc(0) }
+		}
+		return $this.NewToken([TokenType]::PSKeyword)
 	}
 
 	[Token] ScanNumber() {
@@ -243,8 +277,21 @@ class Tokenizer {
 			')' {return $this.NewToken([TokenType]::RParen)}
 			'[' {return $this.NewToken([TokenType]::LBracket)}
 			']' {return $this.NewToken([TokenType]::RBracket)}
-			'{' {return $this.NewToken([TokenType]::LCurly)}
-			'}' {return $this.NewToken([TokenType]::RCurly)}
+			'{' {
+					if ($this.classCounter.Counters[0] -gt 0) {
+						$this.classCounter.Inc(1)
+					}
+					return $this.NewToken([TokenType]::LCurly)
+				}
+			'}' {
+					if ($this.classCounter.Counters[0] -gt 0) {
+						$this.classCounter.Dec(1)
+						if ($this.classCounter.Counters[1] -eq 0) {
+							$this.classCounter.Dec(0)
+						}
+					}
+					return $this.NewToken([TokenType]::RCurly)
+				}
 			'+' {return $this.NewToken([TokenType]::Plus)}
 			'-' {return $this.NewToken([TokenType]::Minus)}
 			'/' {return $this.NewToken([TokenType]::Divide)}
@@ -297,7 +344,7 @@ class Tokenizer {
 			'.' {
 				if($this.PeekChar() -match '[_a-z:]') {
 					if($this.tokens[-1].Type -in [TokenType]::WhiteSpace, [TokenType]::NewLine, [TokenType]::SemiColon, [TokenType]::LCurly, [TokenType]::LParen, $null) {
-						return $this.ScanDirective()
+						return $this.ScanIdentifier() # Identifiers can start with a . and not all directives start with a . so ScanIdentifier is used to figure out if it's a directive or not
 					}
 					return $this.ScanMember()
 				}

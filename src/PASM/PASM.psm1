@@ -12,6 +12,7 @@ Get-ChildItem -Path "$PSScriptRoot\Enums\*.ps1" -ErrorAction Ignore | ForEach-Ob
 # Get-ChildItem -Path "$PSScriptRoot\Classes\*.ps1" -ErrorAction Ignore | ForEach-Object {
 # 	. $_.FullName
 # }
+. "$PSScriptRoot\Classes\MultiLevelCounter.ps1"
 . "$PSScriptRoot\Classes\Token.ps1"
 . "$PSScriptRoot\Classes\Tokenizer.ps1"
 . "$PSScriptRoot\Classes\Scope.ps1"

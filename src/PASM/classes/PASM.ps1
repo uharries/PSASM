@@ -28,6 +28,7 @@ class PASM {
 	[bool]$NoHostOutput
 	[SemanticParser]$parser
 	[Scope[]]$scopes
+	[hashtable]$Macros = [ordered] @{0 = [ordered] @{ BRA = {param($addr)jmp $addr}}} # [ScopeID][Name] = [ScriptBlock]
 
 	PASM() {
 		$this.Init()
@@ -93,6 +94,7 @@ class PASM {
 		$this.symbolManager.CurrentPass = $this.CurrentPass
 		$this.symbolManager.scopes = $this.scopes
 		# write-host $this.psSource
+		# $this.Macros | ft -auto | out-string | write-host
 		return $this.parser
 	}
 
@@ -152,10 +154,11 @@ class PASM {
 			}
 			# not quite sure what to do with errors and the $error object here yet...
 
+			$this.assembly = @($this.assembly | Sort-Object addr)
 			$this.loadAddress = $this.assembly[0].addr
 			$bin.Clear()
 			$bin.Add(([byte]($this.loadAddress -band 255)))
-			$bin.Add(([byte](($this.loadAddress / 256) -band 255)))
+			$bin.Add(([byte](($this.loadAddress -shr 8) -band 255)))
 			$addrCnt = $this.loadAddress
 			foreach ($l in $this.assembly) {
 				if($l.addr - $addrCnt -gt 0) {

@@ -202,6 +202,34 @@ Describe 'Invoke-Assembler Function' {
 		}
 	}
 
+	Context 'Complex Stuff' {
+		It 'Returns expected <binary> from <code>' -TestCases @(
+			@{ code = @'
+MySpace = &{
+
+	ConstValue = 10
+	.pc $2000
+someData:
+	.byte 1,2,3,4,5
+
+	.macro noop($count) {
+		.fill $count { 0xea }
+	}
+
+
+}
+lda MySpace.someData
+lda #<MySpace.someData
+lda #>MySpace.someData
+MySpace.noop(MySpace.ConstValue)
+'@
+			; binary = @(0,0x20,1,2,3,4,5,0xad,0,0x20,0xa9,0,0xa9,0x20,0xea,0xea,0xea,0xea,0xea,0xea,0xea,0xea,0xea,0xea)}
+
+			) {
+			($code | Invoke-Assembler -NoHostOutput).Binary | Should -Be $binary
+		}
+	}
+
 
 	AfterAll {
 		Remove-Item -Path $testSourceFile, $testPSOutFile, $testOutFile -Force

@@ -5,7 +5,9 @@ function .macro {
 		[string]$Name,
 
 		[Parameter(ValueFromRemainingArguments = $true)]
-		[object[]]$MacroArgs
+		[object[]]$MacroArgs,
+
+		[int]$ScopeID = 0
 	)
 
 	if ($MacroArgs.Count -eq 0) {
@@ -76,7 +78,11 @@ function .macro {
 	}
 
 	$sb = [scriptblock]::Create($FunctionText)
-	set-item "Function:\script:$Name" -Value $sb
+	# set-item "Function:\script:$Name" -Value $sb
+
+	$pasm.Macros[$ScopeID] ?? ($pasm.Macros[$ScopeID] = [ordered]@{})
+
+	$pasm.Macros[$ScopeID][$Name] = $sb
 # 	$msg = Get-Item "Function:\$Name" | fl | Out-String
 # 	write-host $msg
 }

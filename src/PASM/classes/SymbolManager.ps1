@@ -4,23 +4,28 @@ class SymbolManager {
 	[Scope[]]$scopes
 
 	[void] SetSymbol([SymbolEntry]$symbol) {
+		# Write-Host "SetSymbol(symbol={name=$($symbol.Name), scopeId=$($symbol.ScopeId), pass=$($symbol.Pass), value=$($symbol.Value)})" -ForegroundColor Magenta
 		$pass = $symbol.Pass
 		# $pass = [string]$symbol.Pass
 		$scope = $symbol.ScopeId
 		$name = $symbol.Name
 
 		if (-not $this.Symbols[$pass]) {
+			# Write-Host "  SetSymbol: Initializing Symbols for Pass $pass" -ForegroundColor Magenta
 			$this.Symbols[$pass] = [ordered]@{}
 		}
 
 		if (-not $this.Symbols[$pass][$scope]) {
+			# Write-Host "  SetSymbol: Initializing Symbols for Scope '$scope' in Pass $pass" -ForegroundColor Magenta
 			$this.Symbols[$pass][$scope] = [ordered]@{}
 		}
 
 		if (-not $this.Symbols[$pass][$scope][$name]) {
+			# Write-Host "  SetSymbol: Initializing Symbols for Name '$name' in Scope '$scope' in Pass $pass" -ForegroundColor Magenta
 			$this.Symbols[$pass][$scope][$name] = [System.Collections.Generic.List[SymbolEntry]]::new()
 		}
 
+		# Write-Host "  SetSymbol: Adding Symbol '$name' in Scope '$scope' in Pass $pass with Value $($symbol.Value)" -ForegroundColor Magenta
 		$this.Symbols[$pass][$scope][$name].Add($symbol)
 	}
 
@@ -42,6 +47,7 @@ class SymbolManager {
 
 
 	[SymbolEntry] GetSymbol($name, [int]$scopeId, [int]$callerLine, [int]$callerColumn, [System.Management.Automation.InvocationInfo]$invocation) {
+		# Write-Host "GetSymbol(name=$name,scopeId=$scopeId)" -ForegroundColor Magenta
 		$names = $name.Split('.')
 		$nameIsQualified = $names.count -gt 1 ? $true : $false
 
@@ -73,15 +79,17 @@ class SymbolManager {
 		# $currentPass = $numPasses - 1
 		$previousPass = $currPass - 1
 
-		### In this case previousPass is pass 0, and Pass 0 should add all labels
-		if ($currPass -le 1) {
-			if ($this.Symbols[0][$scope] -and $this.Symbols[0][$scope][$name]) {
-				# write-host "Symbol '$name' found in scope '$scope' in pass 0: val: $($this.Symbols[0][$scope][$name][-1].Value)"
-				return $this.Symbols[0][$scope][$name][-1]
-			}
-		}
+		# Write-Host "  GetSymbol: numPasses = $numPasses, currPass = $currPass" -ForegroundColor Magenta
 
-		if ($this.CurrentPass -gt 1) {
+		### In this case previousPass is pass 0, and Pass 0 should add all labels
+		# if ($currPass -le 1) {
+		# 	if ($this.Symbols[0][$scope] -and $this.Symbols[0][$scope][$name]) {
+		# 		write-host "  GetSymbol: Symbol '$name' found in scope '$scope' in pass 0: val: $($this.Symbols[0][$scope][$name][-1].Value)" -ForegroundColor Magenta
+		# 		return $this.Symbols[0][$scope][$name][-1]
+		# 	}
+		# }
+
+		if ($this.CurrentPass -gt 0) {
 			# Write-Host "NUMPASSES $numPasses CurrentPass $($this.currentPass) PREV PASS: $previousPass"
 			# Write-Host "Symbol Count: $($this.Symbols.Count)"
 			# Write-Host "Scope: $scope"
@@ -131,7 +139,10 @@ class SymbolManager {
 
 
     [boolean] TestSymbol([string]$name, [int]$scopeId) {
-		$names=$name.Split('.')
+		$v=$name.Split('.')
+		# Split dotted string, but keep leading dot if present
+		if ($v[0].Length -eq 0) {$v[1]='.'+$v[1];$v=$v[1..($v.count-1)]}
+		$names = $v
 		foreach ($n in $names) {
 			$scopeId = $this.scopes.Where({$_.ParentId -eq $scopeId -and $_.Name -eq $n}, 'Last')?.Id ?? $scopeId
 		}

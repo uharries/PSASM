@@ -12,7 +12,7 @@ class SemanticParser {
 		$this.inTokens = $this.t.tokens
 		$this.outTokens = [System.Collections.Generic.List[Token]]::new()
 		$this.scopeManager = [ScopeManager]::new()
-		$this.Macros = [System.Collections.Generic.List[string]]::new()
+		$this.Macros = [System.Collections.Generic.List[PSCustomObject]]::new()
 		$this.MapSymbols()
 		$this.MapScopes()
 		$this.MapMacros()
@@ -48,20 +48,64 @@ class SemanticParser {
 		return $this.inTokens[$i].Type -eq $tokenType
 	}
 
+	[bool] IsNextToken([int]$tokenIndex, [TokenType[]]$tokenTypes) {
+		$i = $this.SkipWhitespace($tokenIndex + 1)
+		return $this.inTokens[$i].Type -in $tokenTypes
+	}
+
+	[int] SkipToNextToken([int]$tokenIndex) {
+		$tokenIndex++
+		while($this.inTokens[$tokenIndex].Type -eq [TokenType]::WhiteSpace) {$tokenIndex++}
+		return $tokenIndex
+	}
+
 	[int] SkipToNextToken([int]$tokenIndex, [TokenType]$tokenType) {
+		$tokenIndex++
 		while($this.inTokens[$tokenIndex].Type -ne $tokenType) {$tokenIndex++}
 		return $tokenIndex
 	}
 
 	[int] SkipToNextToken([int]$tokenIndex, [TokenType[]]$tokenTypes) {
+		$tokenIndex++
 		while($this.inTokens[$tokenIndex].Type -notin $tokenTypes) {$tokenIndex++}
 		return $tokenIndex
 	}
 
+	[int] SkipToPrevToken([int]$tokenIndex, [TokenType]$tokenType) {
+		$tokenIndex--
+		while($this.inTokens[$tokenIndex].Type -ne $tokenType) {$tokenIndex--}
+		return $tokenIndex
+	}
+
+	[int] SkipToPrevToken([int]$tokenIndex, [TokenType[]]$tokenTypes) {
+		$tokenIndex--
+		while($this.inTokens[$tokenIndex].Type -notin $tokenTypes) {$tokenIndex--}
+		return $tokenIndex
+	}
+
+	[int] ParseUntilNextToken([int]$tokenIndex, [TokenType]$tokenType) {
+		while ($this.inTokens[$tokenIndex].Type -ne $tokenType) { $tokenIndex = $this.ParseToken($tokenIndex) }
+		return $tokenIndex
+	}
+
+	[int] ParseUntilAfterNextToken([int]$tokenIndex, [TokenType]$tokenType) {
+		while ($this.inTokens[$tokenIndex-1].Type -ne $tokenType) { $tokenIndex = $this.ParseToken($tokenIndex) }
+		return $tokenIndex
+	}
 
 	[bool] IsPrevToken([int]$tokenIndex, [TokenType]$tokenType) {
 		$i = $this.SkipWhitespaceBackwards($tokenIndex - 1)
 		return $this.inTokens[$i].Type -eq $tokenType
+	}
+
+	[bool] IsPrevToken([int]$tokenIndex, [TokenType[]]$tokenTypes) {
+		$i = $this.SkipWhitespaceBackwards($tokenIndex - 1)
+		return $this.inTokens[$i].Type -in $tokenTypes
+	}
+
+	[bool] IsPrevTokenValue([int]$tokenIndex, [string]$tokenValue) {
+		$i = $this.SkipWhitespaceBackwards($tokenIndex - 1)
+		return $this.inTokens[$i].Value -match $tokenValue
 	}
 
 
@@ -148,17 +192,24 @@ class SemanticParser {
 		$this.symbolManager.scopes = $this.scopeManager.scopes
 	}
 
+	### To support empty parameter lists for macros both in definition and calls, we need to know all macro names beforehand
+	### This allows to define a macrio like .macro myMacro() {...} and call it like myMacro()
+	### We also need to know macro names, to assign them to scopes...
 	[void] MapMacros() {
 		for ($tokenIndex = 0; $tokenindex -lt $this.inTokens.Count; $tokenIndex++) {
 		    $token = $this.inTokens[$tokenIndex]
 		    switch($token.Type) {
 		        ([TokenType]::Directive) {
 		            if ($token.Value -match '\.mac(ro)?') {
-		                $j = 1
-		                while ($this.inTokens[$tokenIndex+$j].Type -eq [TokenType]::WhiteSpace) {$j++}
-		                if ($this.inTokens[$tokenIndex+$j].Type -eq [TokenType]::Identifier) {
-		                    $this.Macros.Add($this.inTokens[$tokenIndex+$j].Value)
-		                }
+						$scopeid = $this.scopeManager.GetScopeByIndex($tokenIndex).Id
+						if ($this.IsNextToken($tokenIndex, [TokenType[]]@([TokenType]::Identifier,[TokenType]::Directive))) {
+							$ti = $this.SkipToNextToken($tokenIndex)
+							$this.Macros.Add([pscustomobject]@{ScopeID = $scopeid;Name = $this.inTokens[$ti].Value})
+							# STUPID shit: you should update everything, as you now know the scope of everyting, pre-assembler time
+							$this.symbolManager.AddUnscopedSymbol($this.inTokens[$ti].Value)
+						} else {
+							throw "Macro definition at line $($token.Line), column $($token.Column) missing name"
+						}
 		            }
 		        }
 		    }
@@ -167,6 +218,9 @@ class SemanticParser {
 
 
 	[int] ParseToken([int]$tokenIndex) {
+		if ($tokenIndex -ge $this.inTokens.Count) {
+			throw "Parser error: Token index $tokenIndex out of range"
+		}
 		$nextTokenIndex = $tokenIndex + 1
 		$token = $this.inTokens[$tokenIndex]
 		switch($token.Type) {
@@ -228,6 +282,14 @@ class SemanticParser {
 				# }
 			}
 
+			([TokenType]::Directive) {
+				$this.AddToken($token.Value)
+				if ($token.Value -match '\.mac(ro)?') {
+					$nextTokenIndex = $this.ParseUntilAfterNextToken($tokenIndex+1, [TokenType]::RCurly)
+					$this.AddToken(" -ScopeID $($this.scopeManager.GetCurrentScope());")
+				}
+			}
+
 			([TokenType]::Identifier) {
 				$tval = $token.Value
 				$ti = $tokenIndex
@@ -249,13 +311,24 @@ class SemanticParser {
 					break
 				}
 				if($this.symbolManager.TestSymbol($tval, $this.scopeManager.GetCurrentScope())) {
-					# $this.AddToken("`(_getSymbol '$($tval)' $($this.scopeManager.GetCurrentScope()) $($token.Line) $($token.Column))")
-					# write-host "Identifier __getSymbol()"
-					$this.AddToken('(_getSymbol "'+$($tval)+'" '+$($this.scopeManager.GetCurrentScope())+' '+$($token.Line)+' '+$($token.Column)+')')
-					$nextTokenIndex = $ti+1
-				} else {
-					$this.AddToken($token.Value)
+					# Get the macro name without any scope qualification, but keep the leading . if $tval is not qualified.
+					$mname = $tval -replace '^(?!\.[^.]+$).*\.', ''
+					if ($mname -in $this.Macros.Name -and -not ($this.IsPrevTokenValue($ti, '\.mac(ro)?'))) {
+						$this.AddToken("_invokeMacro -name '$tval' -ScopeID $($this.scopeManager.GetCurrentScope()) -MacroArgs @(")
+						# Parse nested expression until semicolon or newline
+						$ti++
+						while ($this.inTokens[$ti].Type -notin $null, [TokenType]::SemiColon, [TokenType]::NewLine) {$ti = $this.ParseToken($ti)}
+						$this.AddToken(")")
+						$nextTokenIndex = $ti
+						break
+					}
+					if (-not ($mname -in $this.Macros.Name)) {
+						$this.AddToken('(_getSymbol "'+$($tval)+'" '+$($this.scopeManager.GetCurrentScope())+' '+$($token.Line)+' '+$($token.Column)+')')
+						$nextTokenIndex = $ti+1
+						break
+					}
 				}
+				$this.AddToken($token.Value)
 			}
 
 			([TokenType]::CStyleBlockComment) {
@@ -301,7 +374,7 @@ class SemanticParser {
 				$this.AddToken($token.Value)
 				$ti = $tokenIndex+1
 				while ($this.inTokens[$ti].Type -notin $null, [TokenType]::RCurly) { $ti = $this.ParseToken($ti) }
-				$ti = $this.ParseToken($ti) # Parse the closing curly brace to avaoid stack backtracking in the while loop above
+				$ti = $this.ParseToken($ti) # Parse the closing curly brace to avoid stack backtracking in the while loop above
 				$nextTokenIndex = $ti
 			}
 
@@ -311,31 +384,51 @@ class SemanticParser {
 			}
 
 			([TokenType]::LParen) {
-				$i = $tokenIndex+1
-				while($this.inTokens[$i].Type -eq [TokenType]::WhiteSpace) {
-					$i++
-				}
-				if ($this.inTokens[$i].Type -eq [TokenType]::RParen) {
-					$i = $tokenIndex-1
-					while($this.inTokens[$i].Type -eq [TokenType]::WhiteSpace) {
-						$i--
-					}
-					if ($this.inTokens[$i].Value -in $this.Macros) {
-						$this.AddToken(" @")
-					} elseif ($this.inTokens[$i].Type -eq [TokenType]::Identifier) {
-						$i--
-						while($this.inTokens[$i].Type -eq [TokenType]::WhiteSpace) {
-							$i--
+				if ($this.IsNextToken($tokenIndex, [TokenType]::RParen)) {
+					# fucking power fuckshell and its inconsistent early type inference... why the fuck do I need to cast the TokenType array here?!?!??!!??!????
+					if ($this.IsPrevToken($tokenIndex, [TokenType[]]@([TokenType]::Identifier, [TokenType]::Member))) {
+						$ti = $this.SkipToPrevToken($tokenIndex, [TokenType[]]@([TokenType]::Identifier, [TokenType]::Member))
+						$tval = $this.inTokens[$ti].Type -eq [TokenType]::Member ? $this.inTokens[$ti].Value.Substring(1) : $this.inTokens[$ti].Value
+						if ($tval -in $this.Macros.Name) {
+							$nextTokenIndex = $this.SkipToNextToken($tokenIndex, [TokenType]::RParen) + 1
+							break
 						}
-						if ($this.inTokens[$i].Type -eq [TokenType]::Directive) {
-							if ($this.inTokens[$i].Value -match '\.mac(ro)?') {
-								$this.AddToken(" @")
-							}
+						if ($this.IsPrevToken($ti, [TokenType]::Directive) -and $this.IsPrevTokenValue($ti, '\.mac(ro)?')) {
+							$nextTokenIndex = $this.SkipToNextToken($tokenIndex, [TokenType]::RParen) + 1
+							break
 						}
 					}
 				}
 				$this.AddToken($token.Value)
 			}
+			# 	while($this.inTokens[$i].Type -eq [TokenType]::WhiteSpace) {
+			# 		$i++
+			# 	}
+			# 	### Check for macro call or macro definition and handle empty () both for definition and call
+			# 	### by casting / forcing an empty array as parameter.
+			# 	if ($this.inTokens[$i].Type -eq [TokenType]::RParen) {
+			# 		$i = $tokenIndex-1
+			# 		while($this.inTokens[$i].Type -eq [TokenType]::WhiteSpace) {
+			# 			$i--
+			# 		}
+			# 		# $tval = $this.inTokens[$i].Type -eq [TokenType]::Member ? $this.inTokens[$i].Value.Substring(1) : $this.inTokens[$i].Value
+			# 		# if ($tval -in $this.Macros) {
+			# 		# 	# $this.AddToken(" @")
+			# 		# }
+			# 		if ($this.inTokens[$i].Type -eq [TokenType]::Identifier) {
+			# 			$i--
+			# 			while($this.inTokens[$i].Type -eq [TokenType]::WhiteSpace) {
+			# 				$i--
+			# 			}
+			# 			if ($this.inTokens[$i].Type -eq [TokenType]::Directive) {
+			# 				if ($this.inTokens[$i].Value -match '\.mac(ro)?') {
+			# 					$this.AddToken(" @")
+			# 				}
+			# 			}
+			# 		}
+			# 	}
+			# 	$this.AddToken($token.Value)
+			# }
 
 			([TokenType]::Asterisk) {
 				$match = $false

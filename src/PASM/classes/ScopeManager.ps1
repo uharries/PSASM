@@ -53,6 +53,10 @@ class ScopeManager {
 		return $this.Scopes | Where-Object { $_.Id -eq $id }
 	}
 
+	[Scope] GetScopeByIndex([int] $index) {
+		return $this.Scopes | Where-Object { $_.StartIndex -le $index -and $_.EndIndex -ge $index } | Sort-Object StartIndex -Descending | Select-Object -First 1
+	}
+
 
 	[bool] IsVisible([int] $definitionScopeId, [int] $currentScopeId) {
 		if ($definitionScopeId -eq $currentScopeId) {

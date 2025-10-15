@@ -40,5 +40,7 @@ enum TokenType {
 	StringLiteral
 	StringExpandable
 	PSFunctionParameter
+	PSKeyword
+	PSClassMethod
 	EOF
 }
