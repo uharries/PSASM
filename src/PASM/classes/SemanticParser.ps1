@@ -84,7 +84,14 @@ class SemanticParser {
 	}
 
 	[int] ParseUntilNextToken([int]$tokenIndex, [TokenType]$tokenType) {
+		$tokenIndex++
 		while ($this.inTokens[$tokenIndex].Type -ne $tokenType) { $tokenIndex = $this.ParseToken($tokenIndex) }
+		return $tokenIndex
+	}
+
+	[int] ParseUntilNextToken([int]$tokenIndex, [TokenType[]]$tokenTypes) {
+		$tokenIndex++
+		while ($this.inTokens[$tokenIndex].Type -notin $tokenTypes) { $tokenIndex = $this.ParseToken($tokenIndex) }
 		return $tokenIndex
 	}
 
@@ -285,7 +292,7 @@ class SemanticParser {
 			([TokenType]::Directive) {
 				$this.AddToken($token.Value)
 				if ($token.Value -match '\.mac(ro)?') {
-					$nextTokenIndex = $this.ParseUntilAfterNextToken($tokenIndex+1, [TokenType]::RCurly)
+					$nextTokenIndex = $this.ParseUntilNextToken($tokenIndex, [TokenType[]]@([TokenType]::SemiColon, [TokenType]::NewLine))
 					$this.AddToken(" -ScopeID $($this.scopeManager.GetCurrentScope());")
 				}
 			}
@@ -303,10 +310,9 @@ class SemanticParser {
 					$this.symbolManager.AddUnresolvedSymbol($tval, $this.scopeManager.GetCurrentScope(), $token.Line, $token.Column)
 					$this.AddToken(".label -name $tval -scopeId $($this.scopeManager.GetCurrentScope()) -addr (")
 					# Skip the Equal sign
-					$ti = $this.SkipToNextToken($ti, [TokenType]::Equals) + 1
+					$ti = $this.SkipToNextToken($ti, [TokenType]::Equals)
 					# Parse nested expression until semicolon or newline
-					while ($this.inTokens[$ti].Type -notin $null, [TokenType]::SemiColon, [TokenType]::NewLine) {$ti = $this.ParseToken($ti)}
-					$nextTokenIndex = $ti
+					$nextTokenIndex = $this.ParseUntilNextToken($ti, [TokenType[]]@([TokenType]::SemiColon, [TokenType]::NewLine))
 					$this.AddToken(");")
 					break
 				}
@@ -316,10 +322,8 @@ class SemanticParser {
 					if ($mname -in $this.Macros.Name -and -not ($this.IsPrevTokenValue($ti, '\.mac(ro)?'))) {
 						$this.AddToken("_invokeMacro -name '$tval' -ScopeID $($this.scopeManager.GetCurrentScope()) -MacroArgs @(")
 						# Parse nested expression until semicolon or newline
-						$ti++
-						while ($this.inTokens[$ti].Type -notin $null, [TokenType]::SemiColon, [TokenType]::NewLine) {$ti = $this.ParseToken($ti)}
+						$nextTokenIndex = $this.ParseUntilNextToken($ti, [TokenType[]]@([TokenType]::SemiColon, [TokenType]::NewLine, [TokenType]::RCurly))
 						$this.AddToken(")")
-						$nextTokenIndex = $ti
 						break
 					}
 					if (-not ($mname -in $this.Macros.Name)) {

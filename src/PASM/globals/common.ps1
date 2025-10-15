@@ -11,4 +11,4 @@ $PSKeywords = ("begin","break","catch","class","clean","continue","data","define
 
 ### Use this to generate / update the list as new functions / directives are added:
 ### "`$PASMFunctions = (`"$((Get-PASMFunction).Name -join '", "')`")"
-$PASMFunctions = (".ascii", ".hi", ".lab", ".lo", ".mac", ".petscii", ".txt", "dc.b", "dc.w", ".byte", ".fill", ".inst", ".label", ".macro", ".org", ".pc", ".text", ".word", "_getSymbol", "_hiByte", "_invokeMacro", "_loByte")
+$PASMFunctions = (".ascii", ".hi", ".lab", ".lo", ".mac", ".petscii", ".rep", ".txt", "dc.b", "dc.w", ".byte", ".fill", ".inst", ".label", ".macro", ".org", ".pc", ".repeat", ".text", ".word", "_getSymbol", "_hiByte", "_invokeMacro", "_loByte")

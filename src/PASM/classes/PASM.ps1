@@ -36,7 +36,7 @@ class PASM {
 
 	PASM([string]$asmSource, [bool]$NoHostOutput) {
 		$this.Init()
-		$this.asmSource = $asmSource
+		$this.asmSource = $asmSource + "`n"		# Ensure there's a trailing newline to make parsing easier
 		$this.asmSourceLines = $asmSource.Split("`n")
 		$this.NoHostOutput = $NoHostOutput
 	}

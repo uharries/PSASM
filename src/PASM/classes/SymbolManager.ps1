@@ -48,7 +48,10 @@ class SymbolManager {
 
 	[SymbolEntry] GetSymbol($name, [int]$scopeId, [int]$callerLine, [int]$callerColumn, [System.Management.Automation.InvocationInfo]$invocation) {
 		# Write-Host "GetSymbol(name=$name,scopeId=$scopeId)" -ForegroundColor Magenta
-		$names = $name.Split('.')
+		$v=$name.Split('.')
+		# Split dotted string, but keep leading dot if present
+		if ($v[0].Length -eq 0) {$v[1]='.'+$v[1];$v=$v[1..($v.count-1)]}
+		$names = $v
 		$nameIsQualified = $names.count -gt 1 ? $true : $false
 
 		if ($nameIsQualified) {
