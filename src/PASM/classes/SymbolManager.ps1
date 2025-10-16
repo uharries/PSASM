@@ -45,34 +45,13 @@ class SymbolManager {
 		$this.SetSymbol($sym)
 	}
 
-
-	[SymbolEntry] GetSymbol($name, [int]$scopeId, [int]$callerLine, [int]$callerColumn, [System.Management.Automation.InvocationInfo]$invocation) {
-		# Write-Host "GetSymbol(name=$name,scopeId=$scopeId)" -ForegroundColor Magenta
-		$v=$name.Split('.')
-		# Split dotted string, but keep leading dot if present
-		if ($v[0].Length -eq 0) {$v[1]='.'+$v[1];$v=$v[1..($v.count-1)]}
-		$names = $v
-		$nameIsQualified = $names.count -gt 1 ? $true : $false
-
-		if ($nameIsQualified) {
-			### Find start scope
-			while ($true) {
-				$match = $this.scopes.Where({$_.ParentId -eq $this.scopes[$scopeId].ParentId -and $_.Name -eq $names[0]})
-				if ($match) { $scopeId = $match.Id; break }
-				if ($scopeId -eq $this.scopes[$scopeId].ParentId) { break }
-				$scopeId = $this.scopes[$scopeId].ParentId
-			}
-			### Find scope of symbol
-			foreach ($n in $names) {
-				$scopeId = $this.scopes.Where({$_.ParentId -eq $scopeId -and $_.Name -eq $n})?.Id ?? $scopeId
-			}
-			$name = $names[-1]
-		} else {
-			### Find scope of symbol
-			while ($scopeId -ne 0 -and -not $this.Symbols[0][[string]$scopeId]?[$name]) {
-				$scopeId = $this.scopes[$scopeId].ParentId
-			}
+	[SymbolEntry] GetSymbol($name, [int]$callerScopeId, [int]$callerLine, [int]$callerColumn, [System.Management.Automation.InvocationInfo]$invocation) {
+		$r = $this.ResolveNameAndScope($name, $callerScopeId)
+		if (-not $r.Resolved) {
+			throw "Unresolved symbol '$name'. Scope could not be resolved in line $($callerLine), column $($callerColumn)"
 		}
+		$name = $r.Name
+		$scopeId = $r.ScopeId
 
 		$scope = [string]$scopeId
 		$line = $invocation.ScriptLineNumber
@@ -132,37 +111,89 @@ class SymbolManager {
 					throw "Unresolved symbol in scope '$scope'. Symbol '$name' not found in line $($callerLine), column $($callerColumn)"
 				}
 			} else {
-				return [SymbolEntry]::new()
-				# throw "Unresolved symbol '$name'. Scope '$scope' not found in line $($callerLine), column $($callerColumn)"
+				# return [SymbolEntry]::new()
+				throw "Unresolved symbol '$name'. Scope '$scope' not found in line $($callerLine), column $($callerColumn)"
 			}
 		} else {
-			return [SymbolEntry]::new()
+			throw "GetSymbol() called in pass 0. This should never happen!"
 		}
 	}
 
 
-    [boolean] TestSymbol([string]$name, [int]$scopeId) {
-		$v=$name.Split('.')
+	[boolean] TestSymbol([string]$name, [int]$callerScopeId) {
+		if ($this.ResolveNameAndScope($name, $callerScopeId).Resolved) { return $true } else { return $false }
+	}
+
+	[object] ResolveNameAndScope([string]$name, [int]$callerScopeId) {
 		# Split dotted string, but keep leading dot if present
-		if ($v[0].Length -eq 0) {$v[1]='.'+$v[1];$v=$v[1..($v.count-1)]}
-		$names = $v
-		foreach ($n in $names) {
-			$scopeId = $this.scopes.Where({$_.ParentId -eq $scopeId -and $_.Name -eq $n}, 'Last')?.Id ?? $scopeId
+		$v = $name.Split('.')
+		if ($v[0].Length -eq 0) {
+			$v[1] = '.' + $v[1]
+			$v = $v[1..($v.Count - 1)]
 		}
-		$name = $names[-1]
-		$scope = [string]$scopeId
-        if ($this.Symbols[0] -and $this.Symbols[0][$scope] -and $this.Symbols[0][$scope][$name]) {
-            return $true
-        }
-		$scope = 'Unscoped'
-        if ($this.Symbols[0] -and $this.Symbols[0][$scope] -and $this.Symbols[0][$scope][$name]) {
-            return $true
-        }
-		### ToDo: Implement check for symbol in parent scopes
-        else {
-            return $false
-        }
-    }
+
+		$names = $v
+		$nameIsQualified = $names.Count -gt 1
+		$scopeId = $callerScopeId
+
+		if ($nameIsQualified) {
+			# --- Qualified lookup ---
+			# Start by finding matching top-level scope
+			while ($true) {
+				$match = $this.scopes.Where({$_.ParentId -eq $this.scopes[$scopeId].ParentId -and $_.Name -eq $names[0]})
+				if ($match) { $scopeId = $match.Id; break }
+				if ($scopeId -eq $this.scopes[$scopeId].ParentId) { break } # Reached root
+				$scopeId = $this.scopes[$scopeId].ParentId
+			}
+			# Descend through subscopes - if more than two names.. otherwise we have found the scope already
+			if ($names.count -gt 2) {
+				foreach ($n in $names[1..($names.Count - 2)]) {
+					$next = $this.scopes.Where({$_.ParentId -eq $scopeId -and $_.Name -eq $n})
+					if ($next.Count -gt 1) { throw "Ambiguous scope name '$n' in qualified symbol name '$name'" }
+					if ($next) { $scopeId = $next.Id } else { return [PSCustomObject]@{Resolved = $false;ScopeId = $null;Name = $null} }
+				}
+			}
+			$finalName = $names[-1]
+			if ($this.Symbols[0]?[[string]$scopeId]?[$finalName]) {
+				return [PSCustomObject]@{Resolved = $true;ScopeId = $scopeId;Name = $finalName}
+			} else {
+				return [PSCustomObject]@{Resolved = $false;ScopeId = $null;Name = $null}
+			}
+		} else {
+			# --- Unqualified lookup ---
+			while ($true) {
+				if ($this.Symbols[0]?[[string]$scopeId]?[$name]) { return [PSCustomObject]@{Resolved = $true;ScopeId = $scopeId;Name = $name} }
+				if ($scopeId -eq 0) { break }      # stop after checking global scope
+				$scopeId = $this.scopes[$scopeId].ParentId
+			}
+			return [PSCustomObject]@{Resolved = $false;ScopeId = $null;Name = $null}
+		}
+	}
+
+
+
+
+	# 	$v=$name.Split('.')
+	# 	# Split dotted string, but keep leading dot if present
+	# 	if ($v[0].Length -eq 0) {$v[1]='.'+$v[1];$v=$v[1..($v.count-1)]}
+	# 	$names = $v
+	# 	foreach ($n in $names) {
+	# 		$scopeId = $this.scopes.Where({$_.ParentId -eq $scopeId -and $_.Name -eq $n}, 'Last')?.Id ?? $scopeId
+	# 	}
+	# 	$name = $names[-1]
+	# 	$scope = [string]$scopeId
+	# 	if ($this.Symbols[0] -and $this.Symbols[0][$scope] -and $this.Symbols[0][$scope][$name]) {
+	# 		return $true
+	# 	}
+	# 	$scope = 'Unscoped'
+	# 	if ($this.Symbols[0] -and $this.Symbols[0][$scope] -and $this.Symbols[0][$scope][$name]) {
+	# 		return $true
+	# 	}
+	# 	### ToDo: Implement check for symbol in parent scopes
+	# 	else {
+	# 		return $false
+	# 	}
+	# }
 
 	[object[]] GetSymbolTable() {
 		$table = foreach ($scopeId in $this.Symbols[$this.CurrentPass].Keys) {
@@ -202,7 +233,7 @@ class SymbolManager {
 			}
 		}
 
-		return $table | sort Pass, Scope, Name, Instance | ft
+		return $table | sort Pass, Scope, Name, Instance | ft * -auto
 	}
 
 }
