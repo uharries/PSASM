@@ -13,9 +13,9 @@ class SemanticParser {
 		$this.outTokens = [System.Collections.Generic.List[Token]]::new()
 		$this.scopeManager = [ScopeManager]::new()
 		$this.Macros = [System.Collections.Generic.List[PSCustomObject]]::new()
-		$this.MapSymbols()
-		$this.MapScopes()
-		$this.MapMacros()
+		$this.MapLabels()	### This must be done before mapping scopes and symbols!
+		$this.MapScopes()	### This must be done before mapping symbols!
+		$this.MapSymbols()  ### This must be done before parsing tokens!
 		$this.ParseTokens(0, $this.inTokens.Count)
 	}
 
@@ -154,11 +154,14 @@ class SemanticParser {
 		return -1
 	}
 
-	[void] MapSymbols() {
+	[void] MapLabels() {
 		### This updates the Value property of inTokens directly!
+		# Remove trailing : from labels and create unique names for anonymous labels
 		$labels = $this.inTokens.Where({$_.Type -eq [TokenType]::Label}).ForEach({$_.Value = $_.Value.Trim(':');$_})
 		$anonymousLabels = $this.inTokens.Where({$_.Type -eq [TokenType]::AnonymousLabel}).ForEach({$_.Value = "ANON_L$($_.Line)_C$($_.Column)";$_})
 
+		# Resolve anonymous references to the corresponding anonymous labels
+		# This updates the Value property of the reference token to the resolved label name
 		$anonymousReferences = foreach($ref in $this.inTokens.Where({$_.Type -eq [TokenType]::AnonymousReference})) {
 			if($ref.Value[1] -eq '+') {
 				$r = ($anonymousLabels.Where({$_.Index -gt $ref.Index}) | Sort-Object -Property {$_.Index})[$ref.Length-2]
@@ -169,9 +172,9 @@ class SemanticParser {
 			$ref
 		}
 
-		($labels + $anonymousLabels).ForEach({
-			$this.symbolManager.AddUnscopedSymbol($_.Value)
-		})
+		# ($labels + $anonymousLabels).ForEach({
+		# 	$this.symbolManager.AddUnscopedSymbol($_.Value)
+		# })
 	}
 
 	[void] MapScopes() {
@@ -200,24 +203,32 @@ class SemanticParser {
 	}
 
 	### To support empty parameter lists for macros both in definition and calls, we need to know all macro names beforehand
-	### This allows to define a macrio like .macro myMacro() {...} and call it like myMacro()
+	### This allows to define a macro like .macro myMacro() {...} and call it like myMacro()
 	### We also need to know macro names, to assign them to scopes...
-	[void] MapMacros() {
+	[void] MapSymbols() {
 		for ($tokenIndex = 0; $tokenindex -lt $this.inTokens.Count; $tokenIndex++) {
 		    $token = $this.inTokens[$tokenIndex]
+			$scopeid = $this.scopeManager.GetScopeByIndex($tokenIndex).Id
 		    switch($token.Type) {
 		        ([TokenType]::Directive) {
 		            if ($token.Value -match '\.mac(ro)?') {
-						$scopeid = $this.scopeManager.GetScopeByIndex($tokenIndex).Id
 						if ($this.IsNextToken($tokenIndex, [TokenType[]]@([TokenType]::Identifier,[TokenType]::Directive))) {
 							$ti = $this.SkipToNextToken($tokenIndex)
 							$this.Macros.Add([pscustomobject]@{ScopeID = $scopeid;Name = $this.inTokens[$ti].Value})
-							# STUPID shit: you should update everything, as you now know the scope of everyting, pre-assembler time
-							$this.symbolManager.AddUnscopedSymbol($this.inTokens[$ti].Value)
+							$this.symbolManager.AddUnresolvedSymbol($this.inTokens[$ti].Value, $scopeId, $this.inTokens[$ti].Line, $this.inTokens[$ti].Column)
 						} else {
 							throw "Macro definition at line $($token.Line), column $($token.Column) missing name"
 						}
 		            }
+		        }
+		        ([TokenType]::Label) {
+					$this.symbolManager.AddUnresolvedSymbol($token.Value, $scopeId, $token.Line, $token.Column)
+		        }
+		        ([TokenType]::AnonymousLabel) {
+					$this.symbolManager.AddUnresolvedSymbol($token.Value, $scopeId, $token.Line, $token.Column)
+		        }
+		        ([TokenType]::AnonymousReference) {
+					# $this.symbolManager.AddUnresolvedSymbol($token.Value, $scopeId, $token.Line, $token.Column)
 		        }
 		    }
 		}
