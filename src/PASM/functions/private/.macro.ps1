@@ -64,7 +64,7 @@ function .macro {
 		}
 		$UnpackCode = @"
 	if (`$macroArgs.Count -lt $($ParamNames.Count - $numDefault) -or `$macroArgs.Count -gt $($ParamNames.Count)) {
-		throw "Incorrect number of arguments passed to macro '$Name'. Expected $($ParamNames.Count), got `$(`$macroArgs.Count)."
+		throw "Incorrect number of arguments passed to macro '$Name'. Expected $($ParamNames.Count) (``$($ParamNames.Name -join ', `')), got `$(`$macroArgs.Count) (`$(`$macroArgs -join ', '))"
 	}
 	$($assignments -join "`n")
 "@
@@ -74,6 +74,7 @@ function .macro {
 	$FunctionText = if ([string]::IsNullOrWhiteSpace($ParamList)) {
 		$BodyText
 	} else {
+		# "[PASM(macro)] param([object[]]`$macroArgs)`n`$macroArgs.GetType() | ft -auto | out-string | write-host`n`$macroArgs |  out-string | write-host`n$UnpackCode`n$BodyText"
 		"[PASM(macro)] param([object[]]`$macroArgs)`n$UnpackCode`n$BodyText"
 	}
 

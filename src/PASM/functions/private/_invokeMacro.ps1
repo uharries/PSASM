@@ -9,34 +9,13 @@ function _invokeMacro {
 		[object[]]$MacroArgs
 	)
 
-	$v=$name.Split('.')
-	# Split dotted string, but keep leading dot if present
-	if ($v[0].Length -eq 0) {$v[1]='.'+$v[1];$v=$v[1..($v.count-1)]}
-	$names = $v
-	$nameIsQualified = $names.count -gt 1 ? $true : $false
-
-	if ($nameIsQualified) {
-		### Find start scope
-		while ($true) {
-			$match = $pasm.scopes.Where({$_.ParentId -eq $pasm.scopes[$scopeId].ParentId -and $_.Name -eq $names[0]})
-			if ($match) { $scopeId = $match.Id; break }
-			if ($scopeId -eq $pasm.scopes[$scopeId].ParentId) { break }
-			$scopeId = $pasm.scopes[$scopeId].ParentId
-		}
-		### Find scope of Macro
-		foreach ($n in $names) {
-			$scopeId = $pasm.scopes.Where({$_.ParentId -eq $scopeId -and $_.Name -eq $n})?.Id ?? $scopeId
-		}
-		$name = $names[-1]
-	} else {
-		### Find scope of Macro
-		while ($scopeId -ne 0 -and -not $pasm.Macros[[string]$scopeId]?[$name]) {
-			$scopeId = $pasm.scopes[$scopeId].ParentId
-		}
-	}
-	if (-not $pasm.Macros[$pasm.scopes[$scopeId].ParentId]?[$Name]) {
-		$pasm.Macros | ft -auto | out-string | write-host
+	$r = $pasm.symbolManager.ResolveNameAndScope($Name, $ScopeID)
+	if (-not $r.Resolved) {
 		throw "Macro '$Name' not found in scope $ScopeID"
 	}
-	$pasm.Macros[$pasm.scopes[$scopeId].ParentId][$Name].Invoke($MacroArgs)
+
+	# $MacroArgs.GetType() | ft -auto | out-string | write-host
+	# $MacroArgs | ft -auto | out-string | write-host
+	# Arguments passed to Invoke must be forcibly passed as a single element array, eventhough it's already an object[], otherwise PS will unwrap the individual arguments
+	$pasm.Macros[$r.ScopeId][$r.Name].InvokeReturnAsIs( (,$MacroArgs))
 }
