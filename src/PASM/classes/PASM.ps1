@@ -121,7 +121,8 @@ class PASM {
 					Write-Host " FAILED!"
 					Write-Host "Error in parsing generated PowerShell source code!"
 					Write-Host $this.psSource
-					Write-Host "SymbolTable: $($this.symbolManager.GetSymbolTable() | ft -auto | out-string)"
+					Write-Host "Scopes: $($this.symbolManager.Scopes | ft -auto | out-string)"
+					Write-Host "SymbolTable: $($this.symbolManager.GetFullSymbolTable() | ft -auto | out-string)"
 				}
 				throw $_
 				# throw [System.Exception]::new(("Error in psSource line {0}, column {1}: {2}: {3} '{4}'" -f
@@ -144,7 +145,8 @@ class PASM {
 						Write-Host " FAILED!"
 						Write-Host "Error in executing generated PowerShell source code!"
 						Write-Host $this.psSource
-						Write-Host "SymbolTable: $($this.symbolManager.GetSymbolTable() | ft -auto | out-string)"
+						Write-Host "Scopes: $($this.symbolManager.Scopes | ft -auto | out-string)"
+						Write-Host "SymbolTable: $($this.symbolManager.GetFullSymbolTable() | ft -auto | out-string)"
 					}
 					throw $_
 					# throw [System.Exception]::new(("Error in psSource line {0}, column {1}: {2} '{3}'" -f $psError[0].InvocationInfo.ScriptLineNumber, $psError[0].InvocationInfo.OffsetInLine, $psError[0].CategoryInfo.Reason, $psError[0].CategoryInfo.TargetName))
