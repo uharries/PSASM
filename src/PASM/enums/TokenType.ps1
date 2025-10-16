@@ -42,5 +42,6 @@ enum TokenType {
 	PSFunctionParameter
 	PSKeyword
 	PSClassMethod
+	Dot
 	EOF
 }

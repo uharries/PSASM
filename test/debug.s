@@ -1,1 +1,12 @@
-.macro mac(){nop};.macro mac2(){mac}
+
+.macro mac(){
+	nop
+}
+
+.macro mac2() {
+	mac
+}
+
+	lda	#$23
+	mac2()
+	rts

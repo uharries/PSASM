@@ -352,6 +352,7 @@ class Tokenizer {
 					$this.SkipChar()
 					return $this.NewToken([TokenType]::DotDot)
 				}
+				return $this.NewToken([TokenType]::Dot)
 			}
 			':' {
 				# missing check for ternary <exp> ? <true> : <false>

@@ -435,34 +435,46 @@ class SemanticParser {
 			# }
 
 			([TokenType]::Asterisk) {
-				$match = $false
-				$j=1
-				while($tokenIndex-$j -ge 0 -and $this.inTokens[$tokenIndex-$j].Type -notin $null, [TokenType]::SemiColon, [TokenType]::NewLine){
-					if($this.inTokens[$tokenIndex-$j++].Type -in [TokenType]::Mnemonic, [TokenType]::Directive) {
-						$k=1
-						while($tokenIndex-$k -ge 0 -and $this.inTokens[$tokenIndex-$k].Type -notin [TokenType]::Mnemonic, [TokenType]::Directive){
-							if($this.inTokens[$tokenIndex-$k].Type -in [TokenType]::Whitespace) {
-								$k++
-								continue
-							}
-							if($this.inTokens[$tokenIndex-$k++].Type -in [TokenType]::Comma, [TokenType]::Divide, [TokenType]::Equals, [TokenType]::LAngle, [TokenType]::RAngle, [TokenType]::LParen, [TokenType]::Minus, [TokenType]::Modulo, [TokenType]::Plus, [TokenType]::Asterisk) {
-								$this.AddToken("(.pc)")
-							} else {
-								$this.AddToken($token.Value)
-							}
-							$match = $true
-							break
-						}
-						if(-not $match) {
-							$this.AddToken("(.pc)")
-							$match = $true
-						}
-						break
-					}
+				if ($this.IsPrevToken($tokenIndex, [TokenType[]]@([TokenType]::Equals, [TokenType]::Comma, [TokenType]::Divide, [TokenType]::Minus, [TokenType]::Modulo, [TokenType]::Plus, [TokenType]::Asterisk, [TokenType]::LAngle, [TokenType]::RAngle, [TokenType]::LParen, [TokenType]::Mnemonic, [TokenType]::Directive))) {
+					$this.AddToken("(.pc)")
+					break;
 				}
-				if(-not $match) {
-					$this.AddToken($token.Value)
+				if ($this.IsNextToken($tokenIndex, [TokenType[]]@([TokenType]::Equals, [TokenType]::Comma, [TokenType]::Divide, [TokenType]::Minus, [TokenType]::Modulo, [TokenType]::Plus, [TokenType]::Asterisk, [TokenType]::RParen))) {
+					$this.AddToken("(.pc)")
+					break;
 				}
+				$this.AddToken($token.Value)
+
+
+
+				# $match = $false
+				# $j=1
+				# while($tokenIndex-$j -ge 0 -and $this.inTokens[$tokenIndex-$j].Type -notin $null, [TokenType]::SemiColon, [TokenType]::NewLine){
+				# 	if($this.inTokens[$tokenIndex-$j++].Type -in [TokenType]::Mnemonic, [TokenType]::Directive) {
+				# 		$k=1
+				# 		while($tokenIndex-$k -ge 0 -and $this.inTokens[$tokenIndex-$k].Type -notin [TokenType]::Mnemonic, [TokenType]::Directive){
+				# 			if($this.inTokens[$tokenIndex-$k].Type -in [TokenType]::Whitespace) {
+				# 				$k++
+				# 				continue
+				# 			}
+				# 			if($this.inTokens[$tokenIndex-$k++].Type -in [TokenType]::Comma, [TokenType]::Divide, [TokenType]::Equals, [TokenType]::LAngle, [TokenType]::RAngle, [TokenType]::LParen, [TokenType]::Minus, [TokenType]::Modulo, [TokenType]::Plus, [TokenType]::Asterisk) {
+				# 				$this.AddToken("(.pc)")
+				# 			} else {
+				# 				$this.AddToken($token.Value)
+				# 			}
+				# 			$match = $true
+				# 			break
+				# 		}
+				# 		if(-not $match) {
+				# 			$this.AddToken("(.pc)")
+				# 			$match = $true
+				# 		}
+				# 		break
+				# 	}
+				# }
+				# if(-not $match) {
+				# 	$this.AddToken($token.Value)
+				# }
 			}
 
 			([TokenType]::Mnemonic) {
