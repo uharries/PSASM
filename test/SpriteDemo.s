@@ -126,7 +126,7 @@
 
 function .assert () {
 	// param ([bool]$expr, [string]$failMsg="Assertion failed: ")
-	$argList = $args.count -gt 1 = $args : $args[0]
+	$argList = $args.count -gt 1 ? $args : $args[0]
 	if ($null -ne $args[0]) {$expr = [bool]$args[0]} else {throw ".assert is missing expression!"}
 	if ($null -ne $args[1]) {$failMsg = [string]$args[1]} else {$failMsg = "Assertion failed!"}
 	if ($pasm.CurrentPass -gt 1) {

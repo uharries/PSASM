@@ -10,6 +10,7 @@ class Tokenizer {
 	[hashtable]$state = @{}
 	[System.Collections.Generic.Stack[int]]$ScopeStack
 	[MultiLevelCounter]$classCounter
+	[bool]$sawQuestionMark = $false
 
 	Tokenizer([string]$InputData) {
 		[int]$l=1
@@ -54,6 +55,12 @@ class Tokenizer {
 			return $this.InputData[($this.cpos-1-$numChars)..($this.cpos-1)] -join ''
 		}
 		return $this.InputData[$this.cpos..($this.cpos+$numChars-1)] -join ''
+	}
+
+	[string] PeekCharsBackUntil([char[]]$c) {
+		$cp = 0
+		while ($this.InputData[$this.cpos-1- ++$cp] -notin $c -and $this.cpos-1-$cp -ge 0) {}
+		return $this.InputData[($this.cpos-1-$cp)..($this.cpos-1)] -join ''
 	}
 
 	[char] PeekChar() {
@@ -355,7 +362,10 @@ class Tokenizer {
 				return $this.NewToken([TokenType]::Dot)
 			}
 			':' {
-				# missing check for ternary <exp> ? <true> : <false>
+				if ($this.sawQuestionMark) {
+					$this.sawQuestionMark = $false
+					return $this.NewToken([TokenType]::TernaryColon)
+				}
 				$c1 = $this.PeekChar()
 				if($c1 -eq '+' -or $c1 -eq '-') {
 					while($this.GetChar() -eq $c1) {}
@@ -389,6 +399,22 @@ class Tokenizer {
 					}
 				}
 				return $this.ScanVariable()
+			}
+			'?' {
+				if ($this.PeekChar() -eq '?') {
+					$this.SkipChar()
+					return $this.NewToken([TokenType]::NullCoalesce)
+				}
+				if ($this.PeekChar() -eq '.') {
+					$this.SkipChar()
+					return $this.NewToken([TokenType]::NullConditionalProperty)
+				}
+				if ($this.PeekChar() -eq '[') {
+					$this.SkipChar()
+					return $this.NewToken([TokenType]::NullConditionalIndex)
+				}
+				$this.sawQuestionMark = $true
+				return $this.NewToken([TokenType]::QuestionMark)
 			}
 
 			{$_ -in [char[]]($script:Char_ + $script:CharsAtoZ)} {

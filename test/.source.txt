@@ -20,12 +20,13 @@
 *** MACROS ********************************************************************
 \*****************************************************************************/
 
-.macro BasicPrgHeader($Address=BasicPrgHeader.end, $BasicLineNumber=(Get-Date).Year) {
+.macro BasicPrgHeader($Address=$null, $BasicLineNumber=(Get-Date).Year) {
+	if ($null -eq $Address) { $Address = :++ }
 	.pc $0801
 	.word	:+, $BasicLineNumber		// Link to next BASIC Line
-	.text	$9e, ($Address).ToString(), 0	// SYS, Textual representation of addr, end of BASIC line
+	.text	$9e, ($Address)?.ToString(), 0	// SYS, Textual representation of addr, end of BASIC line
 :	.word	0				// BASIC end marker
-end:
+:
 }
 
 .macro IDisable() {
@@ -81,7 +82,7 @@ end:
 }
 
 .macro IWaitScanLine($scanLine) {
-	ISetBadline	:+ $scanLine
+	ISetBadline(:+, $scanLine)
 	lda	#$8f
 	sta	$d019
 	rti
@@ -123,10 +124,14 @@ end:
 	.fill (([math]::Ceiling((.pc) / $boundary) * $boundary) - (.pc)) {$fillByte}
 }
 
-.macro .assert ($expr,$failMsg) {
+function .assert () {
+	// param ([bool]$expr, [string]$failMsg="Assertion failed: ")
+	$argList = $args.count -gt 1 ? $args : $args[0]
+	if ($null -ne $args[0]) {$expr = [bool]$args[0]} else {throw ".assert is missing expression!"}
+	if ($null -ne $args[1]) {$failMsg = [string]$args[1]} else {$failMsg = "Assertion failed!"}
 	if ($pasm.CurrentPass -gt 1) {
 		if (-not $expr) {
-			throw $failMsg
+			throw $failMsg + $expr
 		}
 	}
 }
@@ -187,7 +192,7 @@ end:
 	IDisable
 	IStableInit
 	jsr	SpriteInit
-	ISet	IRQ 15
+	ISet(IRQ, 15)
 	IEnable
 Main:
 //	dec	$d021
@@ -266,7 +271,7 @@ IRQ:
 //	ora	#%00001000
 //	sta	$d011
 //	inc	$d020
-	ISet	IRQ 15
+	ISet(IRQ, 15)
 	lda	#$8f
 	sta	$d019
 	rti

@@ -43,5 +43,10 @@ enum TokenType {
 	PSKeyword
 	PSClassMethod
 	Dot
+	QuestionMark
+	TernaryColon
+	NullCoalesce
+	NullConditionalProperty
+	NullConditionalIndex
 	EOF
 }
