@@ -17,5 +17,8 @@ function _invokeMacro {
 	# $MacroArgs.GetType() | ft -auto | out-string | write-host
 	# $MacroArgs | ft -auto | out-string | write-host
 	# Arguments passed to Invoke must be forcibly passed as a single element array, eventhough it's already an object[], otherwise PS will unwrap the individual arguments
+	if (-not $pasm.Macros[$r.ScopeId]?[$r.Name]) {
+		throw "Symbol '$Name' in scope '$($r.ScopeId):$($r.ScopeName)' is not a macro or not yet instantiated"
+	}
 	$pasm.Macros[$r.ScopeId][$r.Name].InvokeReturnAsIs( (,$MacroArgs))
 }

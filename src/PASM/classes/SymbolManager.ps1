@@ -150,23 +150,23 @@ class SymbolManager {
 				foreach ($n in $names[1..($names.Count - 2)]) {
 					$next = $this.scopes.Where({$_.ParentId -eq $scopeId -and $_.Name -eq $n})
 					if ($next.Count -gt 1) { throw "Ambiguous scope name '$n' in qualified symbol name '$name'" }
-					if ($next) { $scopeId = $next.Id } else { return [PSCustomObject]@{Resolved = $false;ScopeId = $null;Name = $null} }
+					if ($next) { $scopeId = $next.Id } else { return [PSCustomObject]@{Resolved = $false;ScopeId = $null;ScopeName = $null;Name = $null} }
 				}
 			}
 			$finalName = $names[-1]
 			if ($this.Symbols[0]?[[string]$scopeId]?[$finalName]) {
-				return [PSCustomObject]@{Resolved = $true;ScopeId = $scopeId;Name = $finalName}
+				return [PSCustomObject]@{Resolved = $true;ScopeId = $scopeId; ScopeName = $this.scopes[$ScopeId].Name;Name = $finalName}
 			} else {
-				return [PSCustomObject]@{Resolved = $false;ScopeId = $null;Name = $null}
+				return [PSCustomObject]@{Resolved = $false;ScopeId = $null;ScopeName = $null;Name = $null}
 			}
 		} else {
 			# --- Unqualified lookup ---
 			while ($true) {
-				if ($this.Symbols[0]?[[string]$scopeId]?[$name]) { return [PSCustomObject]@{Resolved = $true;ScopeId = $scopeId;Name = $name} }
+				if ($this.Symbols[0]?[[string]$scopeId]?[$name]) { return [PSCustomObject]@{Resolved = $true;ScopeId = $scopeId;ScopeName = $this.scopes[$ScopeId].Name;Name = $name} }
 				if ($scopeId -eq 0) { break }      # stop after checking global scope
 				$scopeId = $this.scopes[$scopeId].ParentId
 			}
-			return [PSCustomObject]@{Resolved = $false;ScopeId = $null;Name = $null}
+			return [PSCustomObject]@{Resolved = $false;ScopeId = $null;ScopeName = $null;Name = $null}
 		}
 	}
 

@@ -9,5 +9,5 @@ function _getSymbol {
 	# Write-Host "_getSymbol('$name', $scopeId, $callerLine, $callerColumn)" -ForegroundColor Magenta
 	# Write-Host "  _getSymbol: return $($pasm.symbolManager.GetSymbol($name, $scopeId, $callerLine, $callerColumn, $MyInvocation).Value)" -ForegroundColor Magenta
 	# $val = $sym.Values.Count -gt 0 ? $sym.Values[$sym.Values.Count - 1] : 0
-	return [UInt16]$pasm.symbolManager.GetSymbol($name, $scopeId, $callerLine, $callerColumn, $MyInvocation).Value
+	return [object]$pasm.symbolManager.GetSymbol($name, $scopeId, $callerLine, $callerColumn, $MyInvocation).Value
 }

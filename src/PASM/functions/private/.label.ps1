@@ -21,7 +21,7 @@ function .label {
 	if ($addr -is [ValueType]) {
 		$width = $addr -ge 256 ? 16 : 8
 	} else {
-		$addr = 0
+		# $addr = 0
 		$width = 0
 	}
 	# write-host "`nGetSymbol($name,$scopeId)"

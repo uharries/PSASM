@@ -15,18 +15,19 @@ function .inst {
 		[object]$Operand
 	)
 
-	if ($Operand -is [string]) {
-		if ($pasm.symbols.ContainsKey($Operand)) {
-			if ($false -eq $pasm.symbols[$Operand].resolved) {
-				$Operand = [UInt16]0x0000
-			}
-			if ($true -eq $pasm.symbols[$Operand].resolved) {
-				$Operand = [UInt16]($pasm.symbols[$Operand].value)
-			}
-		} else {
-			Write-Error "Symbol not found: '$Operand'"
-		}
-	}
+	# maybe for another day, when I have a need to process symbols stored in variables at runtime, or whatever...
+	# if ($Operand -is [string]) {
+	# 	if ($pasm.symbols.ContainsKey($Operand)) {
+	# 		if ($false -eq $pasm.symbols[$Operand].resolved) {
+	# 			$Operand = [UInt16]0x0000
+	# 		}
+	# 		if ($true -eq $pasm.symbols[$Operand].resolved) {
+	# 			$Operand = [UInt16]($pasm.symbols[$Operand].value)
+	# 		}
+	# 	} else {
+	# 		Write-Error "Symbol not found: '$Operand'"
+	# 	}
+	# }
 
 	if($Operand -lt 256) {
 		switch ($AddressingMode) {

@@ -160,15 +160,15 @@ class Tokenizer {
 			$this.SkipChar()
 			return $this.NewToken([TokenType]::PSFunctionParameter)
 		}
+		if($this.PeekChar() -eq ':') {
+			$this.SkipChar()
+			return $this.NewToken([TokenType]::Label)
+		}
 		if ($this.classCounter.Counters[0] -gt 0 -and $this.classCounter.Counters[1] -eq 1) {
 			# We're in a class, only methods and properties allowed here.. not sure how to handle props yet ;-)
 			# This is necessary to avoid macros being misinterpreted as methods, when used in classes
 			# and classes can be nested, that's why the MultiLevelCounter class is used - 0: class level, 1: scope level - and methods only exist at scope level 1
 			return $this.NewToken([TokenType]::PSClassMethod)
-		}
-		if($this.PeekChar() -eq ':') {
-			$this.SkipChar()
-			return $this.NewToken([TokenType]::Label)
 		}
 		$str = $this.InputData[$this.tokenStart..($this.cpos-1)] -join ''
 		if(($str) -in $script:PSKeywords) {

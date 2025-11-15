@@ -45,9 +45,29 @@ end:
 	cli
 }
 
+
+.macro ISetBadline($irqHandler, $scanLine) {
+	lda	#>$irqHandler
+	sta	$ffff
+	lda	#<$irqHandler
+	sta	$fffe
+	lda	$d011
+	and	#$7f
+	if ((0x1b -band 0x7) -eq (($scanline+1) -band 0x7)) {
+		$scanLine++
+	}
+	if ((0x1b -band 0x7) -eq ($scanline -band 0x7)) {
+		Wait (40)
+	}
+	ora	#((>$scanLine) -shl 7)  //this is clearly wrong.. should be >($scanLine -shl 7), no??!
+	sta	$d011
+	lda	#<$scanLine
+	sta	$d012
+}
+
 .macro ISet($irqHandler, $scanLine) {
-	.assert ((0x1b -band 0x7) -ne ($scanline -band 0x7)) "ISet scanLine $scanLine is a badline!"
-	.assert ((0x1b -band 0x7) -ne (($scanline+1) -band 0x7)) "ISet scanLine $scanLine is a one line befora a badline!"
+	// .assert ((0x1b -band 0x7) -ne ($scanline -band 0x7)) "ISet scanLine $scanLine is a badline!"
+	// .assert ((0x1b -band 0x7) -ne (($scanline+1) -band 0x7)) "ISet scanLine $scanLine is a one line befora a badline!"
 	lda	#>$irqHandler
 	sta	$ffff
 	lda	#<$irqHandler
@@ -61,7 +81,7 @@ end:
 }
 
 .macro IWaitScanLine($scanLine) {
-	ISet	:+ $scanLine
+	ISetBadline	:+ $scanLine
 	lda	#$8f
 	sta	$d019
 	rti
@@ -115,18 +135,6 @@ end:
 	breakpoint:
 }
 
-.macro WaitScanline($line) {
-	lda	#<($line)
-:	cmp	$d012
-	bne	:-
-	bit	$d011
-	if ($line -le 255) {
-		bmi	:-
-	} else {
-		bpl	:-
-	}
-}
-
 .macro IStableInit {
 	// .align	256 $ea
 	ldx	#0
@@ -147,6 +155,17 @@ end:
 	sta	$dc0e			//4 - Write in cycle 60/62 (needs 2 cycles to init from latch)
 	// cycle 5
 
+}
+
+.macro IGoStable2 {		// 17-24 cycles
+	lda	#63-32		//Raster Interrupts will only occur at beginning of line, so limited to 9-16 cycles delayed, giving me an option to not waste NOP bytes, not required... space matters!!
+	sec
+	sbc	$dc04
+	sta	:+
+	bpl	:0
+	.fill	6 {$80}	//drops out after cycle 44 (of 0-62)
+	.byte	$04,$ea
+	.assert ((>(*-1)) -eq (>(:-))) "Page crossed!"
 }
 
 .macro IGoStable {		// 17-24 cycles
@@ -172,19 +191,46 @@ end:
 	IEnable
 Main:
 //	dec	$d021
-	OnSpace	Exit
+	// OnSpace	Exit
+	jmp	Main
+
+	ldx	#0		//Nice nasty loop generating 8 jitter variants when interrupted!
+:	inc	$0400,x
+	bpl	:-
+	bmi	:-
+
 	jmp	Main
 
 	.align 256
 Stable:
+// .break
+	ldx	#0
+	ldy	$d012
+	0..7 | %{
+		tya
+		sec
+		sbc	$d001+$_
+		bmi	:+
+		cmp	#21
+		bpl	:+
+		inx
+	:
+	}
+
+	// lda	$dc04
+	txa
+	asl
+	sta	:+
 	lda $dc04
 	eor	#$3f
+	clc
+	adc	:#0
 	sta	:+
 	bpl	:0
 	.fill	76 {$80}	//drops out after cycle 44 (of 0-62)
 	.byte	$04,$ea
 	.assert ((>(*-1)) -eq (>(:-))) "Page crossed!"
-	Wait (63-22-6)		// routine exits in cycle 0, so -6 to allow dec $d020 write in cycle 0
+	// Wait (63-22-6)		// routine exits in cycle 0, so -6 to allow dec $d020 write in cycle 0
 	rts
 
 
@@ -202,36 +248,17 @@ IRQ:
 	// sta	$d015
 
 //  .break
-	IWaitScanLine (0x8d)
-	jsr Stable
+	.repeat 16 {
+		IWaitScanLine (50+$_*13)
+		jsr Stable
 
-	lda	$d011
-	sta	_restore_d011
-	ldx	$d012
-	.rep 21 {
-		dex
-		txa
-		and	#$07
-		ora	$d011
-		sta	$d011
-		.rep 8 {inc	$d000+$_*2;}
-	:	cmp	$d012
-		beq	:-
+		dec	$d020
+		dec	$d021
+
 	}
-	lda	_restore_d011:#0
-	sta	$d011
-
-	.rep 8 {
-		ldx	#($35+(24*$_))
-		stx	$d000+$_*2
-	}
-
-	// dec	$d020
-	// dec	$d021
-
 	IWaitScanLine 256
 	inc	$d020
-	// jsr	SpriteUpdate
+	jsr	SpriteUpdate
 	dec	$d020
 	lda	#$ff
 	sta	$d015
@@ -249,11 +276,11 @@ IRQ:
 \*****************************************************************************/
 
 SpriteInit:
-	for($i=0;$i -lt 8;$i++) {
-		ldx	#($35+(24*$i))
-		ldy	#$90
-		stx	$d000+$i*2
-		sty	$d001+$i*2
+	ldx	#$35
+	ldy	#$90
+	for($i=0;$i -lt 16;$i+=2) {
+		stx	$d000+$i
+		sty	$d001+$i
 	}
 
 	0..7 | %{

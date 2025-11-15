@@ -365,23 +365,25 @@ class SemanticParser {
 			}
 
 			([TokenType]::LAngle) {
-				$j=1
-				while($tokenIndex-$j -ge 0 -and $this.inTokens[$tokenIndex-$j].Type -notin $null, [TokenType]::SemiColon, [TokenType]::NewLine){
-					if($this.inTokens[$tokenIndex-$j++].Type -in [TokenType]::Mnemonic, [TokenType]::Directive) {
+				### Commenting the following lines out, to always translate > to _hiByte - this breaks PowerShell file redirection operators.
+				# $j=1
+				# while($tokenIndex-$j -ge 0 -and $this.inTokens[$tokenIndex-$j].Type -notin $null, [TokenType]::SemiColon, [TokenType]::NewLine){
+				# 	if($this.inTokens[$tokenIndex-$j++].Type -in [TokenType]::Mnemonic, [TokenType]::Directive) {
 						$this.AddToken("_loByte ")
 						break
-					}
-				}
+				# 	}
+				# }
 			}
 
 			([TokenType]::RAngle) {
-				$j=1
-				while($tokenIndex-$j -ge 0 -and $this.inTokens[$tokenIndex-$j].Type -notin $null, [TokenType]::SemiColon, [TokenType]::NewLine){
-					if($this.inTokens[$tokenIndex-$j++].Type -in [TokenType]::Mnemonic, [TokenType]::Directive) {
+				### Commenting the following lines out, to always translate > to _hiByte - this breaks PowerShell file redirection operators.
+				# $j=1
+				# while($tokenIndex-$j -ge 0 -and $this.inTokens[$tokenIndex-$j].Type -notin $null, [TokenType]::SemiColon, [TokenType]::NewLine){
+				# 	if($this.inTokens[$tokenIndex-$j++].Type -in [TokenType]::Mnemonic, [TokenType]::Directive) {
 						$this.AddToken("_hiByte ")
 						break
-					}
-				}
+				# 	}
+				# }
 			}
 
 			([TokenType]::LCurly) {
