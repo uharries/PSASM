@@ -75,7 +75,7 @@ function Invoke-Assembler {
 
 		[Parameter()]
 		[Alias("lbl")]
-		[string]$LabelFile = "$($SourceFile -replace '(.*)([.].*)','$1').lbl",
+		[string]$LabelFile = $SourceFile ? "$($SourceFile -replace '(.*)([.].*)','$1').lbl" : $null,
 
 		[Alias("ps","psfile")]
 		[string]$DumpPSfile,

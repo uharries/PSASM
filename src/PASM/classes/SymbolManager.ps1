@@ -233,7 +233,7 @@ class SymbolManager {
 			}
 		}
 
-		return $table | sort Pass, Scope, Name, Instance | ft * -auto
+		return $table | sort Pass, Scope, Name, Instance #| ft * -auto
 	}
 
 }
