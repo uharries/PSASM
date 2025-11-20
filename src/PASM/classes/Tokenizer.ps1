@@ -1,21 +1,26 @@
 class Tokenizer {
-
-	[string]$InputData
+	[InputFileStack]$fileStack
+    [System.Collections.Generic.List[char]]$InputData
 	[int]$cpos
-	[hashtable]$lineMap
 	[int]$tokenStart
-	# [System.Collections.Generic.List[Token]]$tokens
-	[System.Collections.Generic.List[Object]]$tokens # Apparently does not work properly when specifying the class...
-	# $tokens
-	[hashtable]$state = @{}
+	[System.Collections.Generic.List[Object]]$tokens # Apparently the <T> needs to be Object, if the type is custom - can be of custom type when the object is initialized
 	[System.Collections.Generic.Stack[int]]$ScopeStack
 	[MultiLevelCounter]$classCounter
-	[bool]$sawQuestionMark = $false
+	[bool]$sawQuestionMark
+	[hashtable]$state
+	[hashtable]$PendingDirective
 
-	Tokenizer([string]$InputData) {
+	# [string]$InputData
+	[string]$Filename		# Just to keep track of the source filename for error reporting
+	[hashtable]$lineMap
+	# [System.Collections.Generic.List[Token]]$tokens
+	# $tokens
+
+	Tokenizer([string]$InputData, [string]$Filename) {
 		[int]$l=1
 		$this.lineMap = @{$l = 0}
 		$this.InputData = $InputData
+		$this.Filename = $Filename
 		$this.cpos = 0
 		$this.tokenStart = 0
 		$this.tokens = [System.Collections.Generic.List[Token]]::new()
@@ -36,6 +41,21 @@ class Tokenizer {
 		$this.Tokenize()
 	}
 
+	Tokenizer([InputFileStack]$fileStack) {
+		$this.fileStack = $fileStack
+		$this.InputData = [System.Collections.Generic.List[char]]::new()
+		$this.cpos = 0
+		$this.tokenStart = 0
+		$this.tokens = [System.Collections.Generic.List[Token]]::new()
+		$this.ScopeStack = [System.Collections.Generic.Stack[int]]::new()
+		$this.classCounter = [MultiLevelCounter]::new(2)
+		$this.sawQuestionMark = $false
+		$this.PendingDirective = $null
+		$this.state = @{}
+		$this.Tokenize()
+	}
+
+
 	Tokenizer() {}
 
 	[void] SetState([string]$key) {
@@ -50,43 +70,116 @@ class Tokenizer {
 		return [bool]$this.state[$key]
 	}
 
-	[string] PeekChars([int]$numChars) {
-		if($numChars -lt 0) {
-			return $this.InputData[($this.cpos-1-$numChars)..($this.cpos-1)] -join ''
-		}
-		return $this.InputData[$this.cpos..($this.cpos+$numChars-1)] -join ''
-	}
+	# [string] PeekChars([int]$numChars) {
+	# 	if($numChars -lt 0) {
+	# 		return $this.InputData[($this.cpos-1-$numChars)..($this.cpos-1)] -join ''
+	# 	}
+	# 	return $this.InputData[$this.cpos..($this.cpos+$numChars-1)] -join ''
+	# }
+
+	# [string] PeekCharsBackUntil([char[]]$c) {
+	# 	$cp = 0
+	# 	while ($this.InputData[$this.cpos-1- ++$cp] -notin $c -and $this.cpos-1-$cp -ge 0) {}
+	# 	return $this.InputData[($this.cpos-1-$cp)..($this.cpos-1)] -join ''
+	# }
+
+	# [char] PeekChar() {
+	# 	return $this.InputData[$this.cpos]
+	# }
+
+	# [void] SkipChar() {
+	# 	$this.cpos++
+	# }
+
+	# [char] GetChar() {
+	# 	return $this.InputData[$this.cpos++]
+	# }
+
+	# [void] UnGetChar() {
+	# 	$this.cpos--
+	# }
+
+	# [string] PeekChars([int]$numChars) {
+	# 	# Ensure InputData has enough chars
+	# 	while ($this.cpos + $numChars -gt $this.InputData.Count) {
+	# 		$ch = $this.FileStack.ReadChar()
+	# 		if ($ch -eq -1) { return $null }
+	# 		$this.InputData.Add($ch)
+	# 	}
+	# 	return -join $this.InputData[$this.cpos..([Math]::Min($this.cpos+$numChars-1, $this.InputData.Count-1))]
+	# }
 
 	[string] PeekCharsBackUntil([char[]]$c) {
-		$cp = 0
-		while ($this.InputData[$this.cpos-1- ++$cp] -notin $c -and $this.cpos-1-$cp -ge 0) {}
-		return $this.InputData[($this.cpos-1-$cp)..($this.cpos-1)] -join ''
+		# Walk backwards from current cpos until one of $c is found
+		$pos = $this.cpos - 1
+		$sb = [System.Text.StringBuilder]::new()
+		while ($pos -ge 0) {
+			$ch = $this.InputData[$pos]
+			if ($c -contains $ch) { break }
+			$sb.Insert(0, $ch) | Out-Null
+			$pos--
+		}
+		return $sb.ToString()
 	}
 
 	[char] PeekChar() {
-		return $this.InputData[$this.cpos]
+		# Ensure InputData has at least one char
+		if ($this.cpos -ge $this.InputData.Count) {
+			$ch = $this.FileStack.ReadChar()
+			if ($ch -eq 0) { return 0 }   # EOF sentinel
+			$this.InputData.Add($ch)
+		}
+		return $this.InputData[$this.cpos] # same index, no increment
 	}
 
 	[void] SkipChar() {
-		$this.cpos++
+		[void]$this.GetChar()
 	}
 
 	[char] GetChar() {
+		# Ensure InputData has at least one char
+		if ($this.cpos -ge $this.InputData.Count) {
+			$ch = $this.FileStack.ReadChar()
+			if ($ch -eq 0) { return 0 }
+			$this.InputData.Add($ch)
+		}
 		return $this.InputData[$this.cpos++]
 	}
 
 	[void] UnGetChar() {
-		$this.cpos--
+		if ($this.cpos -gt 0) {
+			$this.cpos--
+		}
 	}
 
+	# [Token] NewToken([TokenType]$tokenType) {
+	# 	return [Token]::new($tokenType, ($this.InputData[$this.tokenStart..($this.cpos-1)] -join ''), $this.tokenStart, ($this.cpos - $this.tokenStart), ($this.lineMap.GetEnumerator().Where({$_.Value -le $this.tokenStart})[0].Name), ($this.tokenStart - $this.lineMap.GetEnumerator().Where({$_.Value -le $this.tokenStart})[0].Value + 1), $this.Filename)
+	# }
+
 	[Token] NewToken([TokenType]$tokenType) {
-		return [Token]::new($tokenType, ($this.InputData[$this.tokenStart..($this.cpos-1)] -join ''), $this.tokenStart, ($this.cpos - $this.tokenStart), ($this.lineMap.GetEnumerator().Where({$_.Value -le $this.tokenStart})[0].Name), ($this.tokenStart - $this.lineMap.GetEnumerator().Where({$_.Value -le $this.tokenStart})[0].Value + 1))
+		$ctx = $this.FileStack.CurrentContext()
+		$lexeme = ($this.InputData[$this.tokenStart..($this.cpos-1)] -join '')
+
+		$token = [Token]::new(
+			$tokenType,
+			$lexeme,
+			$this.tokenStart,
+			($this.cpos - $this.tokenStart),
+			$ctx.Line,
+			$ctx.Column,
+			$ctx.File
+		)
+
+		# $this.tokens.Add($token)
+
+		return $token
 	}
 
 	[token] ScanNewLine([char]$c) {
 		if($c -eq "`r" -and $this.PeekChar() -eq "`n") {
 			$this.SkipChar()
 		}
+		$this.HandlePendingDirective()
 		return $this.NewToken([TokenType]::NewLine)
 	}
 
@@ -110,8 +203,44 @@ class Tokenizer {
 		return $this.NewToken($tokenType)
 	}
 
-	[Token] ScanDirective() {
+	[Token] ScanDirective($str) {
+		switch -regex ($str) {
+			'^\.include$'		{ $this.PendingDirective = @{Directive=$str; Index=$this.tokens.Count }}
+			'^\.incdir$'		{ $this.PendingDirective = @{Directive=$str; Index=$this.tokens.Count }}
+			'^\.includeonce$'	{ $this.FileStack.MarkCurrentFileIncludeOnce() }
+		}
 		return $this.NewToken([TokenType]::Directive)
+	}
+
+	[void] HandlePendingDirective() {
+		if ($this.PendingDirective) {
+			switch ($this.PendingDirective.Directive) {
+				'.include' {
+					for ($i = $this.PendingDirective.Index+1; $i -lt $this.tokens.Count; $i++) {
+						if ($this.tokens[$i].Type -in [TokenType]::StringLiteral, [TokenType]::StringExpandable) {
+							$file = & { $ExecutionContext.InvokeCommand.ExpandString($this.tokens[$i].Value.Trim('"''')) }
+							if ($file -ne '') {
+								$this.FileStack.PushFile($file)
+							}
+						}
+					}
+					$this.PendingDirective = $null
+					break
+				}
+				'.incdir' {
+					for ($i = $this.PendingDirective.Index+1; $i -lt $this.tokens.Count; $i++) {
+						if ($this.tokens[$i].Type -in [TokenType]::StringLiteral, [TokenType]::StringExpandable) {
+							$file = & { $ExecutionContext.InvokeCommand.ExpandString($this.tokens[$i].Value.Trim('"''')) }
+							if ($file -ne '') {
+								$this.FileStack.AddIncludeDir($file)
+							}
+						}
+					}
+					$this.PendingDirective = $null
+					break
+				}
+			}
+		}
 	}
 
 	[Token] ScanStringLiteral() {
@@ -161,7 +290,7 @@ class Tokenizer {
 	# }
 
 	[Token] ScanIdentifier() {
-		while($this.GetChar() -match '[_a-z0-9]') {}
+		while($this.GetChar() -match '^[_a-z0-9]') {}
 		$this.UnGetChar()
 		if($this.PeekChar() -eq ':' -and $this.tokens[-1].Type -eq [TokenType]::Minus) {
 			$this.SkipChar()
@@ -182,7 +311,7 @@ class Tokenizer {
 			return $this.ScanPSKeyword()
 		}
 		if(($str) -in $script:PASMFunctions) {
-			return $this.ScanDirective()
+			return $this.ScanDirective($str)
 		}
 		if(($this.InputData[$this.tokenStart..$this.cpos] -join '') -match '^(ADC|AND|ASL|BCC|BCS|BEQ|BIT|BMI|BNE|BPL|BRK|BVC|BVS|CLC|CLD|CLI|CLV|CMP|CPX|CPY|DEC|DEX|DEY|EOR|INC|INX|INY|JMP|JSR|LDA|LDX|LDY|LSR|NOP|ORA|PHA|PHP|PLA|PLP|ROL|ROR|RTI|RTS|SBC|SEC|SED|SEI|STA|STX|STY|TAX|TAY|TSX|TXA|TXS|TYA)\b' -and $this.tokens[-1].Type -ne [TokenType]::Minus) {
 			# return $this.ScanMnemonic()
@@ -270,7 +399,7 @@ class Tokenizer {
 				$i=-1
 				while($this.tokens[$i].Type -notin $null, [TokenType]::SemiColon, [TokenType]::NewLine){
 					if($this.tokens[$i].Type -eq [TokenType]::Hash) {
-						return $this.NewToken([TokenType]::PSLineComment)
+						return $this.ScanLineComment([TokenType]::PSLineComment)
 					}
 					if($this.tokens[$i].Type -eq [TokenType]::Mnemonic) {
 						return $this.NewToken([TokenType]::Hash)
@@ -317,7 +446,7 @@ class Tokenizer {
 								$cnt=0
 								while($this.GetChar() -in $script:CharsBin) {$cnt++}
 								$this.UnGetChar()
-								if($cnt -gt 0 -and $this.PeekChar() -match '\W') {
+								if($cnt -gt 0 -and $this.PeekChar() -match '^\W') {
 									return $this.NewToken([TokenType]::NumericLiteral)
 								} else {
 									# return $this.ScanVariable()
@@ -346,10 +475,11 @@ class Tokenizer {
 			"`n" {return $this.ScanNewline($c)}
 			"`r" {return $this.ScanNewline($c)}
 			';' {
+				$this.HandlePendingDirective()
 				return $this.NewToken([TokenType]::SemiColon)
 			}
 			'.' {
-				if($this.PeekChar() -match '[_a-z:]') {
+				if($this.PeekChar() -match '^[_a-z:]') {
 					if($this.tokens[-1].Type -in [TokenType]::WhiteSpace, [TokenType]::NewLine, [TokenType]::SemiColon, [TokenType]::LCurly, [TokenType]::LParen, $null) {
 						return $this.ScanIdentifier() # Identifiers can start with a . and not all directives start with a . so ScanIdentifier is used to figure out if it's a directive or not
 					}
@@ -391,7 +521,7 @@ class Tokenizer {
 						$cnt=0
 						while($this.GetChar() -in $script:CharsHex) {$cnt++}
 						$this.UnGetChar()
-						if($cnt -gt 0 -and $this.PeekChar() -match '\W') {
+						if($cnt -gt 0 -and $this.PeekChar() -match '^\W') {
 							return $this.NewToken([TokenType]::NumericLiteral)
 						} else {
 							# return $this.ScanVariable()
@@ -425,7 +555,7 @@ class Tokenizer {
 			}
 		}
 		Write-Host "'$c' at $($this.cpos ) WHAT?! this should not happen."
-		return [Token]::new()
+		return $this.NewToken([TokenType]::Error)
 	}
 
 	Tokenize() {

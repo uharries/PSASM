@@ -6,7 +6,9 @@
 # $res = '.text "ABCabc",0 -AsPETSCII:$false' | Invoke-Assembler -NoHostOutput
 # $res = Invoke-Assembler -SourceFile ".\test\demo.s" -NoHostOutput
 # $res = 'jmp*' | Invoke-Assembler -ListAssembly -ListBinary
-$res = Invoke-Assembler -SourceFile ".\test\debug.s" -ListAssembly -ListBinary
+$res = '.include ".\test\asm1.s"' | Invoke-Assembler -SourceFile ".\test\debug.s" -ListAssembly -ListBinary
+# $res = '.include ".\test\asm1.s"' | Invoke-Assembler -ListAssembly -ListBinary
+# $res = '.byte $de,$ad' | Invoke-Assembler -ListAssembly -ListBinary
 
 # Write-Host "AssemblyList:" -ForegroundColor Yellow
 # Write-Host "$($res.AssemblyList)"

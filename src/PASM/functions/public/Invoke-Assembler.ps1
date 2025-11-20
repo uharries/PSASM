@@ -96,21 +96,41 @@ function Invoke-Assembler {
 
 	BEGIN {
 		$ErrorActionPreference = 'Stop'
-		[string[]]$asmSource = @()
+		$sb = [System.Text.StringBuilder]::new()
+		$pipelineUsed = $false
 	}
 
 	PROCESS {
-		if ($SourceFile) {
-			$Source = Get-Content -Path $SourceFile -Raw
-		}
-		if ($Source) {
-			$asmSource += $Source
+		$pipelineUsed = $true
+		foreach ($line in $Source) {
+			$null = $sb.AppendLine($line)
 		}
 	}
 
 	END {
-		# $pasm = [PASM]::new($asmSource -join "`n", $NoHostOutput)
-		$pasm = [PASM]::new($asmSource -join "`n", $NoHostOutput)
+
+		if (-not $pipelineUsed -and -not $SourceFile) {
+			Write-Error "No source specified. Use -SourceFile or provide source via the pipeline."
+			return
+		}
+
+		if (-not $pipelineUsed) {
+			foreach ($line in $Source) {
+				$null = $sb.AppendLine($line)
+			}
+		}
+
+		$pasm = [PASM]::new()
+		$pasm.NoHostOutput = $NoHostOutput
+
+		# Source and SourceFile go into a LIFO buffer, so pipeline source is processed first by the assembler, if both supplied
+		if ($SourceFile) {
+			$pasm.LoadFile($SourceFile)
+		}
+		if ($Source) {
+			$pasm.LoadVirtualFile("<PipeLine>", $sb.ToString())
+		}
+
 		$pasm.Parse()
 
 		if ($DumpPSfile) {

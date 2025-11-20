@@ -49,4 +49,6 @@ enum TokenType {
 	NullConditionalProperty
 	NullConditionalIndex
 	EOF
+	Error
+	IncludeDirective
 }

@@ -13,12 +13,16 @@ Get-ChildItem -Path "$PSScriptRoot\Enums\*.ps1" -ErrorAction Ignore | ForEach-Ob
 # 	. $_.FullName
 # }
 . "$PSScriptRoot\Classes\MultiLevelCounter.ps1"
+. "$PSScriptRoot\Classes\InputFileContext.ps1"
+. "$PSScriptRoot\Classes\InputFileStack.ps1"
 . "$PSScriptRoot\Classes\Token.ps1"
 . "$PSScriptRoot\Classes\Tokenizer.ps1"
 . "$PSScriptRoot\Classes\Scope.ps1"
 . "$PSScriptRoot\Classes\ScopeManager.ps1"
 . "$PSScriptRoot\Classes\SymbolEntry.ps1"
 . "$PSScriptRoot\Classes\SymbolManager.ps1"
+. "$PSScriptRoot\Classes\FileMetadata.ps1"
+. "$PSScriptRoot\Classes\SourceFile.ps1"
 . "$PSScriptRoot\Classes\SemanticParser.ps1"
 . "$PSScriptRoot\Classes\PASMAttribute.ps1"
 . "$PSScriptRoot\Classes\AssemblyLine.ps1"

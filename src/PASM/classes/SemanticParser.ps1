@@ -1,16 +1,16 @@
 class SemanticParser {
-	[Tokenizer]$t
-	[Token[]]$inTokens
+	[System.Collections.Generic.List[object]]$inTokens
 	[System.Collections.Generic.List[object]]$outTokens
 	[SymbolManager]$symbolManager
 	[ScopeManager]$scopeManager
 	[System.Collections.Generic.List[object]]$Macros
+	[Tokenizer]$tokenizer
 
-	SemanticParser([string]$InputData) {
-		$this.t = [Tokenizer]::new($InputData)
-		$this.symbolManager = [SymbolManager]::new()
-		$this.inTokens = $this.t.tokens
+	SemanticParser([InputFileStack]$FileStack) {
+		$this.tokenizer = [Tokenizer]::new($FileStack)
+		$this.inTokens = $this.tokenizer.tokens
 		$this.outTokens = [System.Collections.Generic.List[Token]]::new()
+		$this.symbolManager = [SymbolManager]::new()
 		$this.scopeManager = [ScopeManager]::new()
 		$this.Macros = [System.Collections.Generic.List[PSCustomObject]]::new()
 		$this.MapLabels()	### This must be done before mapping scopes and symbols!
@@ -601,8 +601,7 @@ class SemanticParser {
 			}
 
 			([TokenType]::EOF) {
-				$this.scopeManager.ExitScope()
-				$this.AddToken($token.Value)
+				# $this.AddToken($token.Value)
 			}
 
 			default {
