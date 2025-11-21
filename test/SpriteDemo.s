@@ -232,12 +232,11 @@ Stable:
 	adc	:#0
 	sta	:+
 	bpl	:0
-	.fill	76 {$80}	//drops out after cycle 44 (of 0-62)
+	.fill	76 {:$80}	//drops out after cycle 44 (of 0-62)
 	.byte	$04,$ea
 	.assert ((>(*-1)) -eq (>(:-))) "Page crossed!"
 	// Wait (63-22-6)		// routine exits in cycle 0, so -6 to allow dec $d020 write in cycle 0
 	rts
-
 
 Exit:
 	lda	#$37

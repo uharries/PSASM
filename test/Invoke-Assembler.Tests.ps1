@@ -1,14 +1,15 @@
+BeforeAll {
+	# Import the module containing Invoke-Assembler
+	Import-Module -Name "$PSSCriptRoot\..\src\PASM\PASM.psm1" -ErrorAction Stop -Force
+
+	# Optional: Verify the function exists
+	if (-not (Get-Command -Name Invoke-Assembler -ErrorAction SilentlyContinue)) {
+		throw "Invoke-Assembler function not found. Ensure the module is loaded correctly."
+	}
+}
 
 Describe 'Invoke-Assembler Function' {
 	BeforeAll {
-        # Import the module containing Invoke-Assembler
-        Import-Module -Name "$PSSCriptRoot\..\src\PASM\PASM.psm1" -ErrorAction Stop -Force
-
-        # Optional: Verify the function exists
-        if (-not (Get-Command -Name Invoke-Assembler -ErrorAction SilentlyContinue)) {
-            throw "Invoke-Assembler function not found. Ensure the module is loaded correctly."
-        }
-
 		$testSource = @(
 						'	.org $1234',
 						'Start:',
@@ -16,9 +17,9 @@ Describe 'Invoke-Assembler Function' {
 						'	rts'
 						)
 		$testSourceHash = 'BDC4EEAA6C4789A1C2ECB316CD46FD27714A183D0F21DED52785FD687CB6C7C2'
-		$testSourceFile = "testSource.s"
-		$testOutFile = "testOut.prg"
-		$testPSOutFile = "testPSOut.ps1"
+		$testSourceFile = "TestDrive:\testSource.s"
+		$testOutFile = "TestDrive:\testOut.prg"
+		$testPSOutFile = "TestDrive:\testPSOut.ps1"
 
 		Set-Content -Path $testSourceFile -Value $testSource
 	}
@@ -64,7 +65,7 @@ Describe 'Invoke-Assembler Function' {
 	Context 'Output to OutFile' {
 		It 'Should write the binary output to the specified file' {
 			Invoke-Assembler -Source $testSource -OutFile $testOutFile -NoHostOutput
-			Test-Path -Path $testPSOutFile | Should -Be $true
+			Test-Path -Path $testOutFile | Should -Be $true
 			(Get-FileHash -Algorithm SHA256 $testOutFile).Hash | Should -Be $testSourceHash
 		}
 	}
@@ -234,6 +235,50 @@ MySpace.noop(MySpace.ConstValue)
 
 
 	AfterAll {
-		Remove-Item -Path $testSourceFile, $testPSOutFile, $testOutFile -Force
+		# Remove-Item -Path $testSourceFile, $testPSOutFile, $testOutFile -Force
 	}
+}
+
+
+
+Describe 'Include File Handling' {
+	BeforeAll {
+		$testFileA = "TestDrive:\testA.s"
+		$testFileB = "TestDrive:\testB.s"
+	}
+
+	Context 'PushFile Method' {
+		It 'Should detect circular includes and throw an error' {
+			# Arrange
+
+			Set-Content -Path $testFileA -Value '.include "testB.s"' -Force
+			Set-Content -Path $testFileB -Value '.include "testA.s"' -Force
+
+			# Act & Assert
+			{ Invoke-Assembler -SourceFile $testFileA -NoHostOutput } | Should -Throw "Circular include detected*"
+		}
+		# It 'Should skip re-inclusion of include-once files' {
+		# 	# Arrange
+
+		# 	Set-Content -Path $testFileA -Value @(
+		# 		'.includeonce',
+		# 		'nop'
+		# 	) -Force
+
+		# 	# Act
+		# 	$result = ".include $testFileA; .include $testFileA;" | Invoke-Assembler -NoHostOutput
+
+		# 	# Assert
+		# 	$result.Binary | Should -Be @(0,0,0xea,0xea)
+		# }
+	}
+
+	AfterAll {
+		# Cleanup
+		# Start-Sleep -Seconds 1  # Ensure files are not locked
+		# Remove-Item -Path $testFileA, $testFileB -Force
+	}
+}
+
+AfterAll {
 }
