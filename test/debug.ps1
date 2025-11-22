@@ -1,0 +1,2 @@
+.inst nop -AddressingMode Implied
+

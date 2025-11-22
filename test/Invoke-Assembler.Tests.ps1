@@ -57,14 +57,14 @@ Describe 'Invoke-Assembler Function' {
 
 	Context 'Output to DumpPSfile' {
 		It 'Should write the workSource to the specified file' {
-			Invoke-Assembler -Source $testSource -DumpPSfile $testPSOutFile -NoHostOutput
+			Invoke-Assembler -SourceFile $testSourceFile -DumpPSfile $testPSOutFile -NoHostOutput
 			Test-Path -Path $testPSOutFile | Should -Be $true
 		}
 	}
 
 	Context 'Output to OutFile' {
 		It 'Should write the binary output to the specified file' {
-			Invoke-Assembler -Source $testSource -OutFile $testOutFile -NoHostOutput
+			Invoke-Assembler -SourceFile $testSourceFile -OutFile $testOutFile -NoHostOutput
 			Test-Path -Path $testOutFile | Should -Be $true
 			(Get-FileHash -Algorithm SHA256 $testOutFile).Hash | Should -Be $testSourceHash
 		}

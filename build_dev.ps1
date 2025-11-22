@@ -31,6 +31,25 @@ foreach ($m in $Modules.Keys) {
 	}
 }
 
+### Version Handling Stuff ###
+$manifestPath = Join-Path -Path $SourcePath -ChildPath "$ModuleName.psd1"
+$versionInfo  = Join-Path -Path $SourcePath -ChildPath "globals" -AdditionalChildPath "VersionInfo.ps1"
+
+$manifest = Test-ModuleManifest $manifestPath
+$currentVersion = $manifest.Version
+
+$buildDate = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss UTCz')
+Write-Host "Development Build Version: $currentVersion, Build Date: $buildDate" -ForegroundColor Cyan
+
+# Generate version info file
+@"
+# Auto-generated – DO NOT EDIT
+`$script:ModuleVersion   = [version]'$currentVersion'
+`$script:ModuleBuildDate = '$buildDate'
+"@ | Set-Content $versionInfo -Encoding UTF8 -Force
+##############################
+
+
 Invoke-ScriptAnalyzer -Path $ModulePath -Settings PSScriptAnalyzerSettings.psd1 -IncludeDefaultRules -Verbose:$false
 
 $config = New-PesterConfiguration

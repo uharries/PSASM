@@ -65,6 +65,9 @@
 function Invoke-Assembler {
 	[CmdletBinding()]
 	param (
+		[Parameter(ValueFromPipeline)]
+		[object]$InputObject,
+
 		[Parameter()]
 		[Alias("I","Input")]
 		[string]$SourceFile,
@@ -89,46 +92,71 @@ function Invoke-Assembler {
 		[Alias("q")]
 		[switch]$NoHostOutput,
 
-		[Parameter(ValueFromPipeline)]
-		[string[]]$Source
+		[switch]$Version
 	)
-
 
 	BEGIN {
 		$ErrorActionPreference = 'Stop'
-		$sb = [System.Text.StringBuilder]::new()
-		$pipelineUsed = $false
+		function Print-Banner {
+			$vTag = format-string -Text "Version: $($script:ModuleVersion)" -Format Center -OutputStringWidth 21
+			Write-Host "                                                      "
+			Write-Host '        _/_/_/      _/_/      _/_/_/  _/      _/      '
+			Write-Host '       _/    _/  _/    _/  _/        _/_/  _/_/       '
+			Write-Host '      _/_/_/    _/_/_/_/    _/_/    _/  _/  _/        '
+			Write-Host '     _/        _/    _/        _/  _/      _/         '
+			Write-Host '    _/        _/    _/  _/_/_/    _/      _/          '
+			Write-Host "                                                      "
+			Write-Host "      ---> The PowerShell 6502 Assembler <---         "
+			Write-Host "          --> by Ulf Diabelez Harries <--             "
+			Write-Host "             ->$vTag<-                "
+			Write-Host "                                                      "
+		}
+
+		$SourceFiles = @()
+		$SourceLines = [System.Text.StringBuilder]::new()
 	}
 
 	PROCESS {
-		$pipelineUsed = $true
-		foreach ($line in $Source) {
-			$null = $sb.AppendLine($line)
+		if ($InputObject) {
+			if ($InputObject -is [System.IO.FileInfo]) {
+				$SourceFiles += $InputObject
+			} elseif ($InputObject -is [string]) {
+				$SourceLines.AppendLine($InputObject)
+			} else {
+				Write-Warning -Message "Ignoring unsupported input object: $($InputObject.GetType().FullName)"
+			}
 		}
 	}
 
 	END {
-
-		if (-not $pipelineUsed -and -not $SourceFile) {
-			Write-Error "No source specified. Use -SourceFile or provide source via the pipeline."
-			return
+		if (-not $NoHostOutput) {
+			Print-Banner
 		}
 
-		if (-not $pipelineUsed) {
-			foreach ($line in $Source) {
-				$null = $sb.AppendLine($line)
+		if($Version) {
+			if (-not $NoHostOutput) {
+				Write-Host "`nBuilt on $script:ModuleBuildDate`n"
 			}
+			return [version]$script:ModuleVersion
+		}
+
+		if ($SourceLines.Length -eq 0 -and $SourceFiles.Count -eq 0 -and -not $SourceFile) {
+			Write-Error "No source specified. Use -SourceFile or provide source via the pipeline."
+			return $null
 		}
 
 		$pasm = [PASM]::new()
 		$pasm.NoHostOutput = $NoHostOutput
 
-		# Source and SourceFile go into a LIFO buffer, so pipeline source is processed first by the assembler, if both supplied
+		# Source and SourceFile go into a LIFO buffer, so pipeline source is processed before pipeline files, before files on command line by the assembler, if more are supplied
 		if ($SourceFile) {
 			$pasm.LoadFile($SourceFile)
 		}
-		if ($Source) {
-			$pasm.LoadVirtualFile("<PipeLine>", $sb.ToString())
+		foreach ($file in $SourceFiles) {
+			$pasm.LoadFile($file)
+		}
+		if ($SourceLines.Length -gt 0) {
+			$pasm.LoadVirtualFile("<PipeLine>", $SourceLines.ToString())
 		}
 
 		$pasm.Parse()
