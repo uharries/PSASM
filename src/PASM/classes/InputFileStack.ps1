@@ -20,14 +20,25 @@ class InputFileStack {
 		# Resolve the path to a full path
 		$resolved = $this.ResolvePath($path)
 
-		# Detect circular include using for loop
-		$stackArray = $this.Stack.ToArray()	# Enumeration issues if we use foreach directly on the stack
-		for ($i = 0; $i -lt $stackArray.Count; $i++) {
-			if ($stackArray[$i].FilePath -eq $resolved) {
-				$origin = ($i -gt 0) ? $stackArray[$i - 1].FilePath : $stackArray[0].FilePath
-				$chain  = ($stackArray | ForEach-Object FilePath) -join " -> "
-				throw "Circular include detected: '$resolved' was already included by '$origin'. Chain: $chain"
+		# Detect circular include
+		$stackArray = $this.Stack.ToArray()
+		[Array]::Reverse($stackArray)  # root -> current
+
+		$firstOccurrence = $null
+		$parentFile = $null
+
+		for ($j = 0; $j -lt $stackArray.Count; $j++) {
+			if ($stackArray[$j].FilePath -eq $resolved) {
+				$firstOccurrence = $stackArray[$j].FilePath
+				$parentFile = if ($j -eq 0) { $null } else { $stackArray[$j - 1].FilePath }
+				break
 			}
+		}
+
+		if ($firstOccurrence) {
+			$parentMsg = if ($parentFile) { " was already included at '$parentFile'" } else { " was already included" }
+			$chain = ($stackArray | ForEach-Object FilePath) + $resolved -join " -> "
+			throw "Circular include detected: '$resolved'$parentMsg. Chain: $chain"
 		}
 
 		# Check for include-once
@@ -99,4 +110,9 @@ class InputFileStack {
 		[void]$this.IncludeOnceFiles.Add($ctx.FilePath)
 	}
 
+	[void] Dispose() {
+		while ($this.Stack.Count -gt 0) {
+			$this.PopFile()
+		}
+	}
 }

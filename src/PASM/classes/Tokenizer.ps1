@@ -10,37 +10,6 @@ class Tokenizer {
 	[hashtable]$state
 	[hashtable]$PendingDirective
 
-	# [string]$InputData
-	[string]$Filename		# Just to keep track of the source filename for error reporting
-	[hashtable]$lineMap
-	# [System.Collections.Generic.List[Token]]$tokens
-	# $tokens
-
-	Tokenizer([string]$InputData, [string]$Filename) {
-		[int]$l=1
-		$this.lineMap = @{$l = 0}
-		$this.InputData = $InputData
-		$this.Filename = $Filename
-		$this.cpos = 0
-		$this.tokenStart = 0
-		$this.tokens = [System.Collections.Generic.List[Token]]::new()
-		$this.ScopeStack = [System.Collections.Generic.Stack[int]]::new()
-		$this.classCounter = [MultiLevelCounter]::new(2)
-
-		for($i=0;$i -lt $InputData.Length;$i++) {
-			if($InputData[$i] -eq "`r") {
-				if($InputData[$i+1] -lt $InputData.Length -and $InputData[$i+1] -eq "`n") {
-					$i++
-				}
-				$this.lineMap.Add(++$l, $i+1)
-			} elseif($InputData[$i] -eq "`n") {
-				$this.lineMap.Add(++$l, $i+1)
-			}
-		}
-
-		$this.Tokenize()
-	}
-
 	Tokenizer([InputFileStack]$fileStack) {
 		$this.fileStack = $fileStack
 		$this.InputData = [System.Collections.Generic.List[char]]::new()
@@ -55,7 +24,6 @@ class Tokenizer {
 		$this.Tokenize()
 	}
 
-
 	Tokenizer() {}
 
 	[void] SetState([string]$key) {
@@ -69,45 +37,6 @@ class Tokenizer {
 	[bool] GetState([string]$key) {
 		return [bool]$this.state[$key]
 	}
-
-	# [string] PeekChars([int]$numChars) {
-	# 	if($numChars -lt 0) {
-	# 		return $this.InputData[($this.cpos-1-$numChars)..($this.cpos-1)] -join ''
-	# 	}
-	# 	return $this.InputData[$this.cpos..($this.cpos+$numChars-1)] -join ''
-	# }
-
-	# [string] PeekCharsBackUntil([char[]]$c) {
-	# 	$cp = 0
-	# 	while ($this.InputData[$this.cpos-1- ++$cp] -notin $c -and $this.cpos-1-$cp -ge 0) {}
-	# 	return $this.InputData[($this.cpos-1-$cp)..($this.cpos-1)] -join ''
-	# }
-
-	# [char] PeekChar() {
-	# 	return $this.InputData[$this.cpos]
-	# }
-
-	# [void] SkipChar() {
-	# 	$this.cpos++
-	# }
-
-	# [char] GetChar() {
-	# 	return $this.InputData[$this.cpos++]
-	# }
-
-	# [void] UnGetChar() {
-	# 	$this.cpos--
-	# }
-
-	# [string] PeekChars([int]$numChars) {
-	# 	# Ensure InputData has enough chars
-	# 	while ($this.cpos + $numChars -gt $this.InputData.Count) {
-	# 		$ch = $this.FileStack.ReadChar()
-	# 		if ($ch -eq -1) { return $null }
-	# 		$this.InputData.Add($ch)
-	# 	}
-	# 	return -join $this.InputData[$this.cpos..([Math]::Min($this.cpos+$numChars-1, $this.InputData.Count-1))]
-	# }
 
 	[string] PeekCharsBackUntil([char[]]$c) {
 		# Walk backwards from current cpos until one of $c is found
@@ -152,10 +81,6 @@ class Tokenizer {
 		}
 	}
 
-	# [Token] NewToken([TokenType]$tokenType) {
-	# 	return [Token]::new($tokenType, ($this.InputData[$this.tokenStart..($this.cpos-1)] -join ''), $this.tokenStart, ($this.cpos - $this.tokenStart), ($this.lineMap.GetEnumerator().Where({$_.Value -le $this.tokenStart})[0].Name), ($this.tokenStart - $this.lineMap.GetEnumerator().Where({$_.Value -le $this.tokenStart})[0].Value + 1), $this.Filename)
-	# }
-
 	[Token] NewToken([TokenType]$tokenType) {
 		$ctx = $this.FileStack.CurrentContext()
 		$lexeme = ($this.InputData[$this.tokenStart..($this.cpos-1)] -join '')
@@ -169,8 +94,6 @@ class Tokenizer {
 			$ctx.Column,
 			$ctx.File
 		)
-
-		# $this.tokens.Add($token)
 
 		return $token
 	}
@@ -279,15 +202,6 @@ class Tokenizer {
 		}
 		return $this.NewToken([TokenType]::StringExpandable)
 	}
-
-	# [Token] ScanMnemonic() {
-	#     [char]$c = $this.GetChar()
-	#     while($c -notmatch '[;\r\n]' -and -not ($c -eq '/' -and $this.PeekChar() -eq '/')) {
-	#         $c = $this.GetChar()
-	#     }
-	#     $this.UnGetChar()
-	#     return $this.NewToken([TokenType]::Mnemonic)
-	# }
 
 	[Token] ScanIdentifier() {
 		while($this.GetChar() -match '^[_a-z0-9]') {}

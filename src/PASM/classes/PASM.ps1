@@ -18,8 +18,6 @@ class PASM {
 	[UInt16]$loadAddress
 	[SymbolManager]$symbolManager
 	[System.Collections.ArrayList]$assembly
-	# [string]$asmSource
-	# [string[]]$asmSourceLines
 	[string]$psSource
 	[byte[]]$binary
 	[string]$binaryHash
@@ -29,123 +27,26 @@ class PASM {
 	[SemanticParser]$parser
 	[Scope[]]$scopes
 	[hashtable]$Macros = [ordered] @{0 = [ordered] @{ BRA = {param($addr)jmp $addr}}} # [ScopeID][Name] = [ScriptBlock]
-	# [System.Collections.Generic.Dictionary[string, FileMetadata]]$Meta
-	# [System.Collections.Generic.List[SourceFile]]$SourceFiles
 	[InputFileStack]$FileStack
-
 
 	PASM() {
 		$this.Init()
 	}
 
-	PASM([string]$fileName, [bool]$NoHostOutput) {
-		$this.Init()
-		# $this.asmSource = $asmSource + "`n"		# Ensure there's a trailing newline to make parsing easier
-		# $this.asmSourceLines = @(1,2,3,4)
-		$this.NoHostOutput = $NoHostOutput
-		$this.LoadFile($fileName)
-	}
-
 	hidden [void]Init() {
 		$this.pc = 0
 		$this.loadAddress = 0x0000
-		# $this.symbols = [SymbolTable]::new()
-		# $this.symbols.AddSymbol("___load_addr", $this.loadAddress)
-		#  = [ordered] @{
-		# 	____load_addr = @{
-		# 		value = $this.loadAddress
-		# 		width = 16
-		# 		resolved = $true			### Need to find clever way to "actually" resolve this
-		# 	}
-		# }
-		# $this.Meta = @{}
-		# $this.SourceFiles = [System.Collections.Generic.List[SourceFile]]::new()
 		$this.assembly = [System.Collections.ArrayList]@()
 		$this.FileStack = [InputFileStack]::new()
 	}
 
-
-
 	[void] LoadFile([string]$filePath) {
 		$this.FileStack.PushFile($filePath)
-
-		# $full = [IO.Path]::GetFullPath($filePath)
-
-		# # Create metadata entry if needed
-		# if (-not $this.Meta.ContainsKey($full)) {
-		# 	$this.Meta[$full] = [FileMetadata]::new($full)
-		# }
-
-		# $m = $this.Meta[$full]
-
-		# # Skip if the file has .includeonce AND was included before
-		# if ($m.IncludeOnce -and $m.HasBeenIncluded) {
-		# 	return
-		# }
-
-		# if (-not (Test-Path $full)) {
-		# 	throw ".include file not found: $filePath"
-		# }
-
-		# $text = Get-Content $full -Raw
-
-		# # Detect .includeonce inside the file text
-		# if ($text -match '^\s*\.includeonce\b') {
-		# 	$m.IncludeOnce = $true
-		# }
-
-		# # Process includes inside the text
-		# $expanded = $this.ResolveIncludes($text, (Split-Path $full))
-
-		# # Store the file
-		# $this.SourceFiles.Insert(0, [SourceFile]::new($full, $expanded))
-
-		# # Mark as included
-		# $m.HasBeenIncluded = $true
 	}
 
 	[void] LoadVirtualFile([string]$virtualName, [string]$sourceCode) {
 		$this.FileStack.PushVirtualFile($virtualName, $sourceCode)
-
-		# # Set up metadata entry
-		# if (-not $this.Meta.ContainsKey($virtualName)) {
-		# 	$this.Meta[$virtualName] = [FileMetadata]::new($virtualName)
-		# }
-
-		# $m = $this.Meta[$virtualName]
-
-		# # Detect .includeonce inside the file text
-		# if ($sourceCode -match '^\s*\.includeonce\b') {
-		# 	$m.IncludeOnce = $true
-		# }
-
-		# # Allow includes inside pipeline text
-		# $expanded = $this.ResolveIncludes($sourceCode, (Get-Location).Path)
-
-		# $this.SourceFiles.Insert(0,
-		# 	[SourceFile]::new($virtualName, $expanded)
-		# )
-
-		# $m.HasBeenIncluded = $true
 	}
-
-
-	# [string] ResolveIncludes([string]$sourceCode, [string]$baseDir) {
-	# 	$result = New-Object System.Text.StringBuilder
-	# 	$lines = $sourceCode -split "`n"
-
-	# 	foreach ($line in $lines) {
-	# 		if ($line -match '^\s*\.include\s+("?)([^"\s]+)\1') {
-	# 			$includePath = Join-Path $baseDir $Matches[2]
-	# 			$this.LoadFile($includePath)
-	# 			continue
-	# 		}
-	# 		$null = $result.AppendLine($line)
-	# 	}
-	# 	return $result.ToString()
-	# }
-
-
 
 	[void]AddLine([UInt16]$addr, [byte[]]$bytes, [System.Management.Automation.InvocationInfo]$invocation) {
 		$this.assembly.Add([AssemblyLine]::new($addr, $bytes, $invocation.ScriptLineNumber, $invocation.OffsetInLine, 0, $invocation.Line.Trim(), $invocation.ScriptName))
@@ -179,6 +80,7 @@ class PASM {
 	[SemanticParser]Parse() {
 		# $this.SourceFiles | ft -auto | out-string | write-host
 		$this.parser = [SemanticParser]::new($this.FileStack)
+		$this.FileStack.Dispose()
 		$this.psSource = $this.parser.outTokens.value -join ''
 		# write-host $this.psSource
 		$this.scopes = $this.parser.scopeManager.scopes

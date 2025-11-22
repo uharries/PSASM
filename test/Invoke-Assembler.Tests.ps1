@@ -242,41 +242,35 @@ MySpace.noop(MySpace.ConstValue)
 
 
 Describe 'Include File Handling' {
-	BeforeAll {
+	BeforeEach {
 		$testFileA = "TestDrive:\testA.s"
 		$testFileB = "TestDrive:\testB.s"
+		$testFileC = "TestDrive:\testC.s"
+		$testFileD = "TestDrive:\testD.s"
 	}
 
 	Context 'PushFile Method' {
 		It 'Should detect circular includes and throw an error' {
-			# Arrange
-
 			Set-Content -Path $testFileA -Value '.include "testB.s"' -Force
 			Set-Content -Path $testFileB -Value '.include "testA.s"' -Force
 
-			# Act & Assert
 			{ Invoke-Assembler -SourceFile $testFileA -NoHostOutput } | Should -Throw "Circular include detected*"
 		}
-		# It 'Should skip re-inclusion of include-once files' {
-		# 	# Arrange
 
-		# 	Set-Content -Path $testFileA -Value @(
-		# 		'.includeonce',
-		# 		'nop'
-		# 	) -Force
+		It 'Should skip re-inclusion of include-once files' {
+			Set-Content -Path $testFileA -Value @('.includeonce; nop') -Force
+			Set-Content -Path $testFileB -Value '' -Force
 
-		# 	# Act
-		# 	$result = ".include $testFileA; .include $testFileA;" | Invoke-Assembler -NoHostOutput
-
-		# 	# Assert
-		# 	$result.Binary | Should -Be @(0,0,0xea,0xea)
-		# }
+			$result = ".include '$testFileA'; .include '$testFileA';" | Invoke-Assembler -NoHostOutput
+			$result.Binary | Should -Be @(0,0,0xea)
+		}
 	}
 
-	AfterAll {
-		# Cleanup
-		# Start-Sleep -Seconds 1  # Ensure files are not locked
-		# Remove-Item -Path $testFileA, $testFileB -Force
+	AfterEach {
+		# Cleanup - Pester TestDrive is a bitch, so have to do manual garbage collection...
+		[gc]::Collect()
+		[gc]::Collect()
+		Remove-Item -Path $testFileA, $testFileB -Force
 	}
 }
 

@@ -30,7 +30,7 @@ class InputFileContext {
 		return [char]$code
 	}
 
-	[void] Close() { $this.Reader.Close() }
+	[void] Close() { $this.Reader.Dispose() }
 
 	[void] AddIncludeDir([string]$path) {
 		$full = (Resolve-Path $path).Path

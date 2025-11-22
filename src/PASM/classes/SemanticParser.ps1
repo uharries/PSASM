@@ -21,10 +21,6 @@ class SemanticParser {
 
 	SemanticParser() {}
 
-	# [Token] NewToken([string]$value) {
-	#     return [Token]::new([TokenType]::Unknown, $value)
-	# }
-
 	[void] AddToken([string]$value) {
 		$this.outTokens.Add([Token]::new([TokenType]::Unknown, $value))
 	}
@@ -115,7 +111,6 @@ class SemanticParser {
 		return $this.inTokens[$i].Value -match $tokenValue
 	}
 
-
 	hidden [int] LookBackForToken([int]$startIndex, [TokenType[]]$stopTypes, [TokenType[]]$matchTypes, [bool]$skipParenthesis) {
 		$i = 1
 		$depth = 0
@@ -171,10 +166,6 @@ class SemanticParser {
 			$ref.Value = $r.Value
 			$ref
 		}
-
-		# ($labels + $anonymousLabels).ForEach({
-		# 	$this.symbolManager.AddUnscopedSymbol($_.Value)
-		# })
 	}
 
 	[void] MapScopes() {
@@ -281,23 +272,8 @@ class SemanticParser {
 				}
 			}
 
-			# ([TokenType]::AnonymousReference) {
-			#     if($token.Value[1] -eq '+') {
-			#         $ref = $this.inTokens.Where({$_.Type -eq [TokenType]::AnonymousLabel -and $_.Index -gt $token.Index})[$token.Length-2]
-			#     } else {
-			#         $ref = ($this.inTokens.Where({$_.Type -eq [TokenType]::AnonymousLabel -and $_.Index -lt $token.Index}) | Sort-Object -Descending -Property {$_.Index})[$token.Length-2]
-			#     }
-			#     $this.AddToken("`$__SYM_ANON_L$($ref.Line)_C$($ref.Column)")
-			# }
-
 			([TokenType]::AnonymousReference) {
-				# if($this.symbolManager.TestSymbol($token.Value, $this.scopeManager.GetCurrentScope())) {
-					# write-host "AnonymousReference __getSymbol()"
-					$this.AddToken("(_getSymbol '$($token.Value)' $($this.scopeManager.GetCurrentScope()) $($token.Line) $($token.Column))")
-					# $this.AddToken("`$script:__SYM_$($token.Value)")
-				# } else {
-					# $this.AddToken($token.Value)
-				# }
+				$this.AddToken("(_getSymbol '$($token.Value)' $($this.scopeManager.GetCurrentScope()) $($token.Line) $($token.Column))")
 			}
 
 			([TokenType]::Directive) {
@@ -418,34 +394,6 @@ class SemanticParser {
 				}
 				$this.AddToken($token.Value)
 			}
-			# 	while($this.inTokens[$i].Type -eq [TokenType]::WhiteSpace) {
-			# 		$i++
-			# 	}
-			# 	### Check for macro call or macro definition and handle empty () both for definition and call
-			# 	### by casting / forcing an empty array as parameter.
-			# 	if ($this.inTokens[$i].Type -eq [TokenType]::RParen) {
-			# 		$i = $tokenIndex-1
-			# 		while($this.inTokens[$i].Type -eq [TokenType]::WhiteSpace) {
-			# 			$i--
-			# 		}
-			# 		# $tval = $this.inTokens[$i].Type -eq [TokenType]::Member ? $this.inTokens[$i].Value.Substring(1) : $this.inTokens[$i].Value
-			# 		# if ($tval -in $this.Macros) {
-			# 		# 	# $this.AddToken(" @")
-			# 		# }
-			# 		if ($this.inTokens[$i].Type -eq [TokenType]::Identifier) {
-			# 			$i--
-			# 			while($this.inTokens[$i].Type -eq [TokenType]::WhiteSpace) {
-			# 				$i--
-			# 			}
-			# 			if ($this.inTokens[$i].Type -eq [TokenType]::Directive) {
-			# 				if ($this.inTokens[$i].Value -match '\.mac(ro)?') {
-			# 					$this.AddToken(" @")
-			# 				}
-			# 			}
-			# 		}
-			# 	}
-			# 	$this.AddToken($token.Value)
-			# }
 
 			([TokenType]::Asterisk) {
 				if ($this.IsPrevToken($tokenIndex, [TokenType[]]@([TokenType]::Equals, [TokenType]::Comma, [TokenType]::Divide, [TokenType]::Minus, [TokenType]::Modulo, [TokenType]::Plus, [TokenType]::Asterisk, [TokenType]::LAngle, [TokenType]::RAngle, [TokenType]::LParen, [TokenType]::Mnemonic, [TokenType]::Directive))) {
@@ -457,37 +405,6 @@ class SemanticParser {
 					break;
 				}
 				$this.AddToken($token.Value)
-
-
-
-				# $match = $false
-				# $j=1
-				# while($tokenIndex-$j -ge 0 -and $this.inTokens[$tokenIndex-$j].Type -notin $null, [TokenType]::SemiColon, [TokenType]::NewLine){
-				# 	if($this.inTokens[$tokenIndex-$j++].Type -in [TokenType]::Mnemonic, [TokenType]::Directive) {
-				# 		$k=1
-				# 		while($tokenIndex-$k -ge 0 -and $this.inTokens[$tokenIndex-$k].Type -notin [TokenType]::Mnemonic, [TokenType]::Directive){
-				# 			if($this.inTokens[$tokenIndex-$k].Type -in [TokenType]::Whitespace) {
-				# 				$k++
-				# 				continue
-				# 			}
-				# 			if($this.inTokens[$tokenIndex-$k++].Type -in [TokenType]::Comma, [TokenType]::Divide, [TokenType]::Equals, [TokenType]::LAngle, [TokenType]::RAngle, [TokenType]::LParen, [TokenType]::Minus, [TokenType]::Modulo, [TokenType]::Plus, [TokenType]::Asterisk) {
-				# 				$this.AddToken("(.pc)")
-				# 			} else {
-				# 				$this.AddToken($token.Value)
-				# 			}
-				# 			$match = $true
-				# 			break
-				# 		}
-				# 		if(-not $match) {
-				# 			$this.AddToken("(.pc)")
-				# 			$match = $true
-				# 		}
-				# 		break
-				# 	}
-				# }
-				# if(-not $match) {
-				# 	$this.AddToken($token.Value)
-				# }
 			}
 
 			([TokenType]::Mnemonic) {
@@ -588,10 +505,6 @@ class SemanticParser {
 				$addressingMode = [MOS6502AddressingMode]$state.ToString()
 				$this.AddToken(" -AddressingMode $($addressingMode) -Operand (")
 
-				# write-Host $operandTokensIndex
-				# foreach ($t in $operandTokensIndex) {
-				# 	write-host $this.inTokens[$t].Type, $this.inTokens[$t].Value
-				# }
 				for($i=0;$i -lt $operandTokensIndex.Count;$i++) {
 					$ti = $this.ParseToken($operandTokensIndex[$i]) - 1
 					while($i -lt $operandTokensIndex.Count -and $ti -ge $operandTokensIndex[$i+1]) {$i++}

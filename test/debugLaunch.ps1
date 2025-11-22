@@ -7,7 +7,7 @@
 # $res = Invoke-Assembler -SourceFile ".\test\demo.s" -NoHostOutput
 # $res = 'jmp*' | Invoke-Assembler -ListAssembly -ListBinary
 New-PSDrive -Name Tmp -PSProvider FileSystem -Root D:\Temp\
-$res = Invoke-Assembler -SourceFile "Tmp:\testA.s" -ListAssembly -ListBinary
+$res = Invoke-Assembler -SourceFile "Tmp:\testC.s" -ListAssembly -ListBinary
 # $res = '.include ".\test\asm1.s"' | Invoke-Assembler -ListAssembly -ListBinary
 # $res = '.byte $de,$ad' | Invoke-Assembler -ListAssembly -ListBinary
 

@@ -21,8 +21,6 @@ Get-ChildItem -Path "$PSScriptRoot\Enums\*.ps1" -ErrorAction Ignore | ForEach-Ob
 . "$PSScriptRoot\Classes\ScopeManager.ps1"
 . "$PSScriptRoot\Classes\SymbolEntry.ps1"
 . "$PSScriptRoot\Classes\SymbolManager.ps1"
-. "$PSScriptRoot\Classes\FileMetadata.ps1"
-. "$PSScriptRoot\Classes\SourceFile.ps1"
 . "$PSScriptRoot\Classes\SemanticParser.ps1"
 . "$PSScriptRoot\Classes\PASMAttribute.ps1"
 . "$PSScriptRoot\Classes\AssemblyLine.ps1"

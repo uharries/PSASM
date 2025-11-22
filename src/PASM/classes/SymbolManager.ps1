@@ -63,14 +63,6 @@ class SymbolManager {
 
 		# Write-Host "  GetSymbol: numPasses = $numPasses, currPass = $currPass" -ForegroundColor Magenta
 
-		### In this case previousPass is pass 0, and Pass 0 should add all labels
-		# if ($currPass -le 1) {
-		# 	if ($this.Symbols[0][$scope] -and $this.Symbols[0][$scope][$name]) {
-		# 		write-host "  GetSymbol: Symbol '$name' found in scope '$scope' in pass 0: val: $($this.Symbols[0][$scope][$name][-1].Value)" -ForegroundColor Magenta
-		# 		return $this.Symbols[0][$scope][$name][-1]
-		# 	}
-		# }
-
 		if ($this.CurrentPass -gt 0) {
 			# Write-Host "NUMPASSES $numPasses CurrentPass $($this.currentPass) PREV PASS: $previousPass"
 			# Write-Host "Symbol Count: $($this.Symbols.Count)"
@@ -169,31 +161,6 @@ class SymbolManager {
 			return [PSCustomObject]@{Resolved = $false;ScopeId = $null;ScopeName = $null;Name = $null}
 		}
 	}
-
-
-
-
-	# 	$v=$name.Split('.')
-	# 	# Split dotted string, but keep leading dot if present
-	# 	if ($v[0].Length -eq 0) {$v[1]='.'+$v[1];$v=$v[1..($v.count-1)]}
-	# 	$names = $v
-	# 	foreach ($n in $names) {
-	# 		$scopeId = $this.scopes.Where({$_.ParentId -eq $scopeId -and $_.Name -eq $n}, 'Last')?.Id ?? $scopeId
-	# 	}
-	# 	$name = $names[-1]
-	# 	$scope = [string]$scopeId
-	# 	if ($this.Symbols[0] -and $this.Symbols[0][$scope] -and $this.Symbols[0][$scope][$name]) {
-	# 		return $true
-	# 	}
-	# 	$scope = 'Unscoped'
-	# 	if ($this.Symbols[0] -and $this.Symbols[0][$scope] -and $this.Symbols[0][$scope][$name]) {
-	# 		return $true
-	# 	}
-	# 	### ToDo: Implement check for symbol in parent scopes
-	# 	else {
-	# 		return $false
-	# 	}
-	# }
 
 	[object[]] GetSymbolTable() {
 		$table = foreach ($scopeId in $this.Symbols[$this.CurrentPass].Keys) {
