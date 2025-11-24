@@ -164,6 +164,10 @@ Describe 'Invoke-Assembler Function' {
 			@{ code = '.petscii "ABCabc",0'; binary = @(0, 0, 97, 98, 99, 65, 66, 67, 0)}
 			@{ code = '.petscii "ABC",''abc'',0'; binary = @(0, 0, 97, 98, 99, 65, 66, 67, 0)}
 
+			### Curly tracking in operand area
+			@{ code = '.macro mac($val){lda #0};mac(0)'; binary = @(0, 0, 0xa9, 0)}
+			@{ code = '.macro mac($val){lda #&{2-2}};mac(0)'; binary = @(0, 0, 0xa9, 0)}
+
 		) {
 			($code | Invoke-Assembler -NoHostOutput).Binary | Should -Be $binary
 		}

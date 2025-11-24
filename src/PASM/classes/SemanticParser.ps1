@@ -81,18 +81,18 @@ class SemanticParser {
 
 	[int] ParseUntilNextToken([int]$tokenIndex, [TokenType]$tokenType) {
 		$tokenIndex++
-		while ($this.inTokens[$tokenIndex].Type -ne $tokenType) { $tokenIndex = $this.ParseToken($tokenIndex) }
+		while ($tokenIndex -lt $this.inTokens.Count -and $this.inTokens[$tokenIndex].Type -ne $tokenType) { $tokenIndex = $this.ParseToken($tokenIndex) }
 		return $tokenIndex
 	}
 
 	[int] ParseUntilNextToken([int]$tokenIndex, [TokenType[]]$tokenTypes) {
 		$tokenIndex++
-		while ($this.inTokens[$tokenIndex].Type -notin $tokenTypes) { $tokenIndex = $this.ParseToken($tokenIndex) }
+		while ($tokenIndex -lt $this.inTokens.Count -and $this.inTokens[$tokenIndex].Type -notin $tokenTypes) { $tokenIndex = $this.ParseToken($tokenIndex) }
 		return $tokenIndex
 	}
 
 	[int] ParseUntilAfterNextToken([int]$tokenIndex, [TokenType]$tokenType) {
-		while ($this.inTokens[$tokenIndex-1].Type -ne $tokenType) { $tokenIndex = $this.ParseToken($tokenIndex) }
+		while ($tokenIndex -lt $this.inTokens.Count -and $this.inTokens[$tokenIndex-1].Type -ne $tokenType) { $tokenIndex = $this.ParseToken($tokenIndex) }
 		return $tokenIndex
 	}
 
@@ -227,7 +227,7 @@ class SemanticParser {
 
 
 	[int] ParseToken([int]$tokenIndex) {
-		if ($tokenIndex -ge $this.inTokens.Count) {
+		if ($tokenIndex -gt $this.inTokens.Count) {
 			throw "Parser error: Token index $tokenIndex out of range"
 		}
 		$nextTokenIndex = $tokenIndex + 1
@@ -414,7 +414,11 @@ class SemanticParser {
 				$addressingMode = $null
 
 				### Find end of Instruction
+				$lcurl=0
 				while($this.inTokens[$instEndIndex].Type -notin [TokenType]::CStyleLineComment, [TokenType]::PSLineComment,  [TokenType]::Newline, [TokenType]::SemiColon, [TokenType]::EOF) {
+					if ($this.inTokens[$instEndIndex].Type -eq [TokenType]::LCurly) { $lcurl++ }
+					if ($this.inTokens[$instEndIndex].Type -eq [TokenType]::RCurly) { $lcurl-- }
+					if ($lcurl -lt 0) { break }
 					$instEndIndex++
 				}
 				### Backtrack whitespaces, to keep trailing whitespace out of Operator parameter
