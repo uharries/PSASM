@@ -1,0 +1,7 @@
+$0000: 01       - File:.\testA.s Ln: 1    - .byte 1;.include '.\test\testB.s'; .byte 3
+$0001: 02       - File:.\testB.s Ln: 1    - .byte 2
+$0002: 03       - File:.\testA.s Ln: 1    - .byte 1;.include '.\test\testB.s'; .byte 3
+$0003: 02       - File:.\testB.s Ln: 1    - .byte 2
+$0004: 04       - File:.\debug.s Ln: 1    - .include 'testA.s'; .include 'testB.s'; .byte 4; .byte 5;
+$0005: 05       - File:.\debug.s Ln: 1    - .include 'testA.s'; .include 'testB.s'; .byte 4; .byte 5;
+

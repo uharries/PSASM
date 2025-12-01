@@ -86,6 +86,10 @@ function Invoke-Assembler {
 		[Alias("l","list")]
 		[switch]$ListAssembly,
 
+		[Parameter()]
+		[Alias("lst")]
+		[string]$ListFile = $SourceFile ? "$($SourceFile -replace '(.*)([.].*)','$1').lst" : $null,
+
 		[Alias("h","hexdump","DumpHex","dump","hex")]
 		[switch]$ListBinary,
 
@@ -166,6 +170,10 @@ function Invoke-Assembler {
 		}
 
 		$asmInfo = $pasm.Assemble()
+
+		if ($ListFile) {
+			$asmInfo.AssemblyList | set-content -path $ListFile -Force
+		}
 
 		if ($ListAssembly) {
 			if (-not $NoHostOutput) {

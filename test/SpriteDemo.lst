@@ -1,0 +1,713 @@
+$0801: 0b 08 e9 07 - File:.\SpriteDemo.s Ln: 26   - .word	:+, $BasicLineNumber		// Link to next BASIC Line
+$0805: 9e 32 30 36 31 00 - File:.\SpriteDemo.s Ln: 27   - .text	$9e, ($Address)?.ToString(), 0	// SYS, Textual representation of addr, end of BASIC line
+$080b: 00 00    - File:.\SpriteDemo.s Ln: 28   - :	.word	0				// BASIC end marker
+$080d: 78       - File:.\SpriteDemo.s Ln: 33   - sei
+$080e: a9 7f    - File:.\SpriteDemo.s Ln: 34   - lda	#$7f		// Diable all CIA Interrupts
+$0810: 8d 0d dc - File:.\SpriteDemo.s Ln: 35   - sta	$dc0d		// From CIA 1 (IRQ)
+$0813: 8d 0d dd - File:.\SpriteDemo.s Ln: 36   - sta	$dd0d		// From CIA 2 (NMI)
+$0816: ad 0d dc - File:.\SpriteDemo.s Ln: 37   - lda	$dc0d		// Ack / clear all pending CIA 1 (IRQ) interrupts
+$0819: ad 0d dd - File:.\SpriteDemo.s Ln: 38   - lda	$dd0d		// Ack / clear all pending CIA 2 (NMI) interrupts
+$081c: a2 00    - File:.\SpriteDemo.s Ln: 145  - ldx	#0
+$081e: a9 3e    - File:.\SpriteDemo.s Ln: 146  - lda	#62			//Init CIA 1 Timer A (Timer will count 62,62,61,60...1,62,62,61,60... So never 0, which matters not as we won't be interrupted on that cycle anyways)
+$0820: 8d 04 dc - File:.\SpriteDemo.s Ln: 147  - sta	$dc04
+$0823: 8e 05 dc - File:.\SpriteDemo.s Ln: 148  - stx	$dc05
+$0826: a2 01    - File:.\SpriteDemo.s Ln: 150  - ldx	#1			//2 - Value to initialize zpTmp with - must be !=0
+$0828: a0 03    - File:.\SpriteDemo.s Ln: 151  - ldy	#3			//2 - Offset to zp address from $ffff - so $ff is used
+$082a: 9e ff ff - File:.\SpriteDemo.s Ln: 153  - :	.byte	$9e,$ff,$ff
+$082d: b5 01    - File:.\SpriteDemo.s Ln: 154  - lda	<($100 + $02 - 1),x	//4 - The -1 here needs to match the number in x
+$082f: f0 f9    - File:.\SpriteDemo.s Ln: 155  - beq	:-			//3/2 - Next cycle is 2
+$0831: a9 11    - File:.\SpriteDemo.s Ln: 159  - lda	#$11			//3 - Start CIA 1 Timer A
+$0833: 8d 0e dc - File:.\SpriteDemo.s Ln: 160  - sta	$dc0e			//4 - Write in cycle 60/62 (needs 2 cycles to init from latch)
+$0836: 20 a1 0c - File:.\SpriteDemo.s Ln: 194  - jsr	SpriteInit
+$0839: a9 09    - File:.\SpriteDemo.s Ln: 72   - lda	#>$irqHandler
+$083b: 8d ff ff - File:.\SpriteDemo.s Ln: 73   - sta	$ffff
+$083e: a9 cd    - File:.\SpriteDemo.s Ln: 74   - lda	#<$irqHandler
+$0840: 8d fe ff - File:.\SpriteDemo.s Ln: 75   - sta	$fffe
+$0843: ad 11 d0 - File:.\SpriteDemo.s Ln: 76   - lda	$d011
+$0846: 29 7f    - File:.\SpriteDemo.s Ln: 77   - and	#$7f
+$0848: 09 00    - File:.\SpriteDemo.s Ln: 78   - ora	#((>$scanLine) -shl 7)  //this is clearly wrong.. should be >($scanLine -shl 7), no??!
+$084a: 8d 11 d0 - File:.\SpriteDemo.s Ln: 79   - sta	$d011
+$084d: a9 0f    - File:.\SpriteDemo.s Ln: 80   - lda	#<$scanLine
+$084f: 8d 12 d0 - File:.\SpriteDemo.s Ln: 81   - sta	$d012
+$0852: a9 35    - File:.\SpriteDemo.s Ln: 42   - lda	#$35
+$0854: 85 01    - File:.\SpriteDemo.s Ln: 43   - sta	$01
+$0856: a9 01    - File:.\SpriteDemo.s Ln: 44   - lda	#$01
+$0858: 8d 1a d0 - File:.\SpriteDemo.s Ln: 45   - sta	$d01a
+$085b: 58       - File:.\SpriteDemo.s Ln: 46   - cli
+$085c: 4c 5c 08 - File:.\SpriteDemo.s Ln: 200  - jmp	Main
+$085f: a2 00    - File:.\SpriteDemo.s Ln: 202  - ldx	#0		//Nice nasty loop generating 8 jitter variants when interrupted!
+$0861: fe 00 04 - File:.\SpriteDemo.s Ln: 203  - :	inc	$0400,x
+$0864: 10 fb    - File:.\SpriteDemo.s Ln: 204  - bpl	:-
+$0866: 30 f9    - File:.\SpriteDemo.s Ln: 205  - bmi	:-
+$0868: 4c 5c 08 - File:.\SpriteDemo.s Ln: 207  - jmp	Main
+$086b: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+       00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+       00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+       00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+       00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+       00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+       00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+       00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+       00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+       00 00 00 00 00 - File:.\SpriteDemo.s Ln: 124  - .fill (([math]::Ceiling((.pc) / $boundary) * $boundary) - (.pc)) {$fillByte}
+$0900: a2 00    - File:.\SpriteDemo.s Ln: 212  - ldx	#0
+$0902: ac 12 d0 - File:.\SpriteDemo.s Ln: 213  - ldy	$d012
+$0905: 98       - File:.\SpriteDemo.s Ln: 215  - tya
+$0906: 38       - File:.\SpriteDemo.s Ln: 216  - sec
+$0907: ed 01 d0 - File:.\SpriteDemo.s Ln: 217  - sbc	$d001+$_
+$090a: 30 05    - File:.\SpriteDemo.s Ln: 218  - bmi	:+
+$090c: c9 15    - File:.\SpriteDemo.s Ln: 219  - cmp	#21
+$090e: 10 01    - File:.\SpriteDemo.s Ln: 220  - bpl	:+
+$0910: e8       - File:.\SpriteDemo.s Ln: 221  - inx
+$0911: 98       - File:.\SpriteDemo.s Ln: 215  - tya
+$0912: 38       - File:.\SpriteDemo.s Ln: 216  - sec
+$0913: ed 02 d0 - File:.\SpriteDemo.s Ln: 217  - sbc	$d001+$_
+$0916: 30 05    - File:.\SpriteDemo.s Ln: 218  - bmi	:+
+$0918: c9 15    - File:.\SpriteDemo.s Ln: 219  - cmp	#21
+$091a: 10 01    - File:.\SpriteDemo.s Ln: 220  - bpl	:+
+$091c: e8       - File:.\SpriteDemo.s Ln: 221  - inx
+$091d: 98       - File:.\SpriteDemo.s Ln: 215  - tya
+$091e: 38       - File:.\SpriteDemo.s Ln: 216  - sec
+$091f: ed 03 d0 - File:.\SpriteDemo.s Ln: 217  - sbc	$d001+$_
+$0922: 30 05    - File:.\SpriteDemo.s Ln: 218  - bmi	:+
+$0924: c9 15    - File:.\SpriteDemo.s Ln: 219  - cmp	#21
+$0926: 10 01    - File:.\SpriteDemo.s Ln: 220  - bpl	:+
+$0928: e8       - File:.\SpriteDemo.s Ln: 221  - inx
+$0929: 98       - File:.\SpriteDemo.s Ln: 215  - tya
+$092a: 38       - File:.\SpriteDemo.s Ln: 216  - sec
+$092b: ed 04 d0 - File:.\SpriteDemo.s Ln: 217  - sbc	$d001+$_
+$092e: 30 05    - File:.\SpriteDemo.s Ln: 218  - bmi	:+
+$0930: c9 15    - File:.\SpriteDemo.s Ln: 219  - cmp	#21
+$0932: 10 01    - File:.\SpriteDemo.s Ln: 220  - bpl	:+
+$0934: e8       - File:.\SpriteDemo.s Ln: 221  - inx
+$0935: 98       - File:.\SpriteDemo.s Ln: 215  - tya
+$0936: 38       - File:.\SpriteDemo.s Ln: 216  - sec
+$0937: ed 05 d0 - File:.\SpriteDemo.s Ln: 217  - sbc	$d001+$_
+$093a: 30 05    - File:.\SpriteDemo.s Ln: 218  - bmi	:+
+$093c: c9 15    - File:.\SpriteDemo.s Ln: 219  - cmp	#21
+$093e: 10 01    - File:.\SpriteDemo.s Ln: 220  - bpl	:+
+$0940: e8       - File:.\SpriteDemo.s Ln: 221  - inx
+$0941: 98       - File:.\SpriteDemo.s Ln: 215  - tya
+$0942: 38       - File:.\SpriteDemo.s Ln: 216  - sec
+$0943: ed 06 d0 - File:.\SpriteDemo.s Ln: 217  - sbc	$d001+$_
+$0946: 30 05    - File:.\SpriteDemo.s Ln: 218  - bmi	:+
+$0948: c9 15    - File:.\SpriteDemo.s Ln: 219  - cmp	#21
+$094a: 10 01    - File:.\SpriteDemo.s Ln: 220  - bpl	:+
+$094c: e8       - File:.\SpriteDemo.s Ln: 221  - inx
+$094d: 98       - File:.\SpriteDemo.s Ln: 215  - tya
+$094e: 38       - File:.\SpriteDemo.s Ln: 216  - sec
+$094f: ed 07 d0 - File:.\SpriteDemo.s Ln: 217  - sbc	$d001+$_
+$0952: 30 05    - File:.\SpriteDemo.s Ln: 218  - bmi	:+
+$0954: c9 15    - File:.\SpriteDemo.s Ln: 219  - cmp	#21
+$0956: 10 01    - File:.\SpriteDemo.s Ln: 220  - bpl	:+
+$0958: e8       - File:.\SpriteDemo.s Ln: 221  - inx
+$0959: 98       - File:.\SpriteDemo.s Ln: 215  - tya
+$095a: 38       - File:.\SpriteDemo.s Ln: 216  - sec
+$095b: ed 08 d0 - File:.\SpriteDemo.s Ln: 217  - sbc	$d001+$_
+$095e: 30 05    - File:.\SpriteDemo.s Ln: 218  - bmi	:+
+$0960: c9 15    - File:.\SpriteDemo.s Ln: 219  - cmp	#21
+$0962: 10 01    - File:.\SpriteDemo.s Ln: 220  - bpl	:+
+$0964: e8       - File:.\SpriteDemo.s Ln: 221  - inx
+$0965: 8a       - File:.\SpriteDemo.s Ln: 226  - txa
+$0966: 0a       - File:.\SpriteDemo.s Ln: 227  - asl
+$0967: 8d 71 09 - File:.\SpriteDemo.s Ln: 228  - sta	:+
+$096a: ad 04 dc - File:.\SpriteDemo.s Ln: 229  - lda $dc04
+$096d: 49 3f    - File:.\SpriteDemo.s Ln: 230  - eor	#$3f
+$096f: 18       - File:.\SpriteDemo.s Ln: 231  - clc
+$0970: 69 00    - File:.\SpriteDemo.s Ln: 232  - adc	:#0
+$0972: 8d 76 09 - File:.\SpriteDemo.s Ln: 233  - sta	:+
+$0975: 10 89    - File:.\SpriteDemo.s Ln: 234  - bpl	:0
+$0977: 80 80 80 80 80 80 80 80 80 80 80 80 80 80 80 80 
+       80 80 80 80 80 80 80 80 80 80 80 80 80 80 80 80 
+       80 80 80 80 80 80 80 80 80 80 80 80 80 80 80 80 
+       80 80 80 80 80 80 80 80 80 80 80 80 80 80 80 80 
+       80 80 80 80 80 80 80 80 80 80 80 80 - File:.\SpriteDemo.s Ln: 235  - .fill	76 {$80}	//drops out after cycle 44 (of 0-62)
+$09c3: 04 ea    - File:.\SpriteDemo.s Ln: 236  - .byte	$04,$ea
+$09c5: 60       - File:.\SpriteDemo.s Ln: 239  - rts
+$09c6: a9 37    - File:.\SpriteDemo.s Ln: 242  - lda	#$37
+$09c8: 85 01    - File:.\SpriteDemo.s Ln: 243  - sta	$01
+$09ca: 4c e2 fc - File:.\SpriteDemo.s Ln: 244  - jmp	64738
+$09cd: a9 09    - File:.\SpriteDemo.s Ln: 51   - lda	#>$irqHandler
+$09cf: 8d ff ff - File:.\SpriteDemo.s Ln: 52   - sta	$ffff
+$09d2: a9 ee    - File:.\SpriteDemo.s Ln: 53   - lda	#<$irqHandler
+$09d4: 8d fe ff - File:.\SpriteDemo.s Ln: 54   - sta	$fffe
+$09d7: ad 11 d0 - File:.\SpriteDemo.s Ln: 55   - lda	$d011
+$09da: 29 7f    - File:.\SpriteDemo.s Ln: 56   - and	#$7f
+$09dc: ea       - File:.\SpriteDemo.s Ln: 109  - .rep ($num/2) {nop;}
+$09dd: ea       - File:.\SpriteDemo.s Ln: 109  - .rep ($num/2) {nop;}
+$09de: 09 00    - File:.\SpriteDemo.s Ln: 63   - ora	#((>$scanLine) -shl 7)  //this is clearly wrong.. should be >($scanLine -shl 7), no??!
+$09e0: 8d 11 d0 - File:.\SpriteDemo.s Ln: 64   - sta	$d011
+$09e3: a9 33    - File:.\SpriteDemo.s Ln: 65   - lda	#<$scanLine
+$09e5: 8d 12 d0 - File:.\SpriteDemo.s Ln: 66   - sta	$d012
+$09e8: a9 8f    - File:.\SpriteDemo.s Ln: 86   - lda	#$8f
+$09ea: 8d 19 d0 - File:.\SpriteDemo.s Ln: 87   - sta	$d019
+$09ed: 40       - File:.\SpriteDemo.s Ln: 88   - rti
+$09ee: 20 00 09 - File:.\SpriteDemo.s Ln: 257  - jsr Stable
+$09f1: ce 20 d0 - File:.\SpriteDemo.s Ln: 259  - dec	$d020
+$09f4: ce 21 d0 - File:.\SpriteDemo.s Ln: 260  - dec	$d021
+$09f7: a9 0a    - File:.\SpriteDemo.s Ln: 51   - lda	#>$irqHandler
+$09f9: 8d ff ff - File:.\SpriteDemo.s Ln: 52   - sta	$ffff
+$09fc: a9 16    - File:.\SpriteDemo.s Ln: 53   - lda	#<$irqHandler
+$09fe: 8d fe ff - File:.\SpriteDemo.s Ln: 54   - sta	$fffe
+$0a01: ad 11 d0 - File:.\SpriteDemo.s Ln: 55   - lda	$d011
+$0a04: 29 7f    - File:.\SpriteDemo.s Ln: 56   - and	#$7f
+$0a06: 09 00    - File:.\SpriteDemo.s Ln: 63   - ora	#((>$scanLine) -shl 7)  //this is clearly wrong.. should be >($scanLine -shl 7), no??!
+$0a08: 8d 11 d0 - File:.\SpriteDemo.s Ln: 64   - sta	$d011
+$0a0b: a9 3f    - File:.\SpriteDemo.s Ln: 65   - lda	#<$scanLine
+$0a0d: 8d 12 d0 - File:.\SpriteDemo.s Ln: 66   - sta	$d012
+$0a10: a9 8f    - File:.\SpriteDemo.s Ln: 86   - lda	#$8f
+$0a12: 8d 19 d0 - File:.\SpriteDemo.s Ln: 87   - sta	$d019
+$0a15: 40       - File:.\SpriteDemo.s Ln: 88   - rti
+$0a16: 20 00 09 - File:.\SpriteDemo.s Ln: 257  - jsr Stable
+$0a19: ce 20 d0 - File:.\SpriteDemo.s Ln: 259  - dec	$d020
+$0a1c: ce 21 d0 - File:.\SpriteDemo.s Ln: 260  - dec	$d021
+$0a1f: a9 0a    - File:.\SpriteDemo.s Ln: 51   - lda	#>$irqHandler
+$0a21: 8d ff ff - File:.\SpriteDemo.s Ln: 52   - sta	$ffff
+$0a24: a9 3e    - File:.\SpriteDemo.s Ln: 53   - lda	#<$irqHandler
+$0a26: 8d fe ff - File:.\SpriteDemo.s Ln: 54   - sta	$fffe
+$0a29: ad 11 d0 - File:.\SpriteDemo.s Ln: 55   - lda	$d011
+$0a2c: 29 7f    - File:.\SpriteDemo.s Ln: 56   - and	#$7f
+$0a2e: 09 00    - File:.\SpriteDemo.s Ln: 63   - ora	#((>$scanLine) -shl 7)  //this is clearly wrong.. should be >($scanLine -shl 7), no??!
+$0a30: 8d 11 d0 - File:.\SpriteDemo.s Ln: 64   - sta	$d011
+$0a33: a9 4c    - File:.\SpriteDemo.s Ln: 65   - lda	#<$scanLine
+$0a35: 8d 12 d0 - File:.\SpriteDemo.s Ln: 66   - sta	$d012
+$0a38: a9 8f    - File:.\SpriteDemo.s Ln: 86   - lda	#$8f
+$0a3a: 8d 19 d0 - File:.\SpriteDemo.s Ln: 87   - sta	$d019
+$0a3d: 40       - File:.\SpriteDemo.s Ln: 88   - rti
+$0a3e: 20 00 09 - File:.\SpriteDemo.s Ln: 257  - jsr Stable
+$0a41: ce 20 d0 - File:.\SpriteDemo.s Ln: 259  - dec	$d020
+$0a44: ce 21 d0 - File:.\SpriteDemo.s Ln: 260  - dec	$d021
+$0a47: a9 0a    - File:.\SpriteDemo.s Ln: 51   - lda	#>$irqHandler
+$0a49: 8d ff ff - File:.\SpriteDemo.s Ln: 52   - sta	$ffff
+$0a4c: a9 66    - File:.\SpriteDemo.s Ln: 53   - lda	#<$irqHandler
+$0a4e: 8d fe ff - File:.\SpriteDemo.s Ln: 54   - sta	$fffe
+$0a51: ad 11 d0 - File:.\SpriteDemo.s Ln: 55   - lda	$d011
+$0a54: 29 7f    - File:.\SpriteDemo.s Ln: 56   - and	#$7f
+$0a56: 09 00    - File:.\SpriteDemo.s Ln: 63   - ora	#((>$scanLine) -shl 7)  //this is clearly wrong.. should be >($scanLine -shl 7), no??!
+$0a58: 8d 11 d0 - File:.\SpriteDemo.s Ln: 64   - sta	$d011
+$0a5b: a9 59    - File:.\SpriteDemo.s Ln: 65   - lda	#<$scanLine
+$0a5d: 8d 12 d0 - File:.\SpriteDemo.s Ln: 66   - sta	$d012
+$0a60: a9 8f    - File:.\SpriteDemo.s Ln: 86   - lda	#$8f
+$0a62: 8d 19 d0 - File:.\SpriteDemo.s Ln: 87   - sta	$d019
+$0a65: 40       - File:.\SpriteDemo.s Ln: 88   - rti
+$0a66: 20 00 09 - File:.\SpriteDemo.s Ln: 257  - jsr Stable
+$0a69: ce 20 d0 - File:.\SpriteDemo.s Ln: 259  - dec	$d020
+$0a6c: ce 21 d0 - File:.\SpriteDemo.s Ln: 260  - dec	$d021
+$0a6f: a9 0a    - File:.\SpriteDemo.s Ln: 51   - lda	#>$irqHandler
+$0a71: 8d ff ff - File:.\SpriteDemo.s Ln: 52   - sta	$ffff
+$0a74: a9 8e    - File:.\SpriteDemo.s Ln: 53   - lda	#<$irqHandler
+$0a76: 8d fe ff - File:.\SpriteDemo.s Ln: 54   - sta	$fffe
+$0a79: ad 11 d0 - File:.\SpriteDemo.s Ln: 55   - lda	$d011
+$0a7c: 29 7f    - File:.\SpriteDemo.s Ln: 56   - and	#$7f
+$0a7e: 09 00    - File:.\SpriteDemo.s Ln: 63   - ora	#((>$scanLine) -shl 7)  //this is clearly wrong.. should be >($scanLine -shl 7), no??!
+$0a80: 8d 11 d0 - File:.\SpriteDemo.s Ln: 64   - sta	$d011
+$0a83: a9 66    - File:.\SpriteDemo.s Ln: 65   - lda	#<$scanLine
+$0a85: 8d 12 d0 - File:.\SpriteDemo.s Ln: 66   - sta	$d012
+$0a88: a9 8f    - File:.\SpriteDemo.s Ln: 86   - lda	#$8f
+$0a8a: 8d 19 d0 - File:.\SpriteDemo.s Ln: 87   - sta	$d019
+$0a8d: 40       - File:.\SpriteDemo.s Ln: 88   - rti
+$0a8e: 20 00 09 - File:.\SpriteDemo.s Ln: 257  - jsr Stable
+$0a91: ce 20 d0 - File:.\SpriteDemo.s Ln: 259  - dec	$d020
+$0a94: ce 21 d0 - File:.\SpriteDemo.s Ln: 260  - dec	$d021
+$0a97: a9 0a    - File:.\SpriteDemo.s Ln: 51   - lda	#>$irqHandler
+$0a99: 8d ff ff - File:.\SpriteDemo.s Ln: 52   - sta	$ffff
+$0a9c: a9 b8    - File:.\SpriteDemo.s Ln: 53   - lda	#<$irqHandler
+$0a9e: 8d fe ff - File:.\SpriteDemo.s Ln: 54   - sta	$fffe
+$0aa1: ad 11 d0 - File:.\SpriteDemo.s Ln: 55   - lda	$d011
+$0aa4: 29 7f    - File:.\SpriteDemo.s Ln: 56   - and	#$7f
+$0aa6: ea       - File:.\SpriteDemo.s Ln: 109  - .rep ($num/2) {nop;}
+$0aa7: ea       - File:.\SpriteDemo.s Ln: 109  - .rep ($num/2) {nop;}
+$0aa8: 09 00    - File:.\SpriteDemo.s Ln: 63   - ora	#((>$scanLine) -shl 7)  //this is clearly wrong.. should be >($scanLine -shl 7), no??!
+$0aaa: 8d 11 d0 - File:.\SpriteDemo.s Ln: 64   - sta	$d011
+$0aad: a9 73    - File:.\SpriteDemo.s Ln: 65   - lda	#<$scanLine
+$0aaf: 8d 12 d0 - File:.\SpriteDemo.s Ln: 66   - sta	$d012
+$0ab2: a9 8f    - File:.\SpriteDemo.s Ln: 86   - lda	#$8f
+$0ab4: 8d 19 d0 - File:.\SpriteDemo.s Ln: 87   - sta	$d019
+$0ab7: 40       - File:.\SpriteDemo.s Ln: 88   - rti
+$0ab8: 20 00 09 - File:.\SpriteDemo.s Ln: 257  - jsr Stable
+$0abb: ce 20 d0 - File:.\SpriteDemo.s Ln: 259  - dec	$d020
+$0abe: ce 21 d0 - File:.\SpriteDemo.s Ln: 260  - dec	$d021
+$0ac1: a9 0a    - File:.\SpriteDemo.s Ln: 51   - lda	#>$irqHandler
+$0ac3: 8d ff ff - File:.\SpriteDemo.s Ln: 52   - sta	$ffff
+$0ac6: a9 e0    - File:.\SpriteDemo.s Ln: 53   - lda	#<$irqHandler
+$0ac8: 8d fe ff - File:.\SpriteDemo.s Ln: 54   - sta	$fffe
+$0acb: ad 11 d0 - File:.\SpriteDemo.s Ln: 55   - lda	$d011
+$0ace: 29 7f    - File:.\SpriteDemo.s Ln: 56   - and	#$7f
+$0ad0: 09 00    - File:.\SpriteDemo.s Ln: 63   - ora	#((>$scanLine) -shl 7)  //this is clearly wrong.. should be >($scanLine -shl 7), no??!
+$0ad2: 8d 11 d0 - File:.\SpriteDemo.s Ln: 64   - sta	$d011
+$0ad5: a9 80    - File:.\SpriteDemo.s Ln: 65   - lda	#<$scanLine
+$0ad7: 8d 12 d0 - File:.\SpriteDemo.s Ln: 66   - sta	$d012
+$0ada: a9 8f    - File:.\SpriteDemo.s Ln: 86   - lda	#$8f
+$0adc: 8d 19 d0 - File:.\SpriteDemo.s Ln: 87   - sta	$d019
+$0adf: 40       - File:.\SpriteDemo.s Ln: 88   - rti
+$0ae0: 20 00 09 - File:.\SpriteDemo.s Ln: 257  - jsr Stable
+$0ae3: ce 20 d0 - File:.\SpriteDemo.s Ln: 259  - dec	$d020
+$0ae6: ce 21 d0 - File:.\SpriteDemo.s Ln: 260  - dec	$d021
+$0ae9: a9 0b    - File:.\SpriteDemo.s Ln: 51   - lda	#>$irqHandler
+$0aeb: 8d ff ff - File:.\SpriteDemo.s Ln: 52   - sta	$ffff
+$0aee: a9 08    - File:.\SpriteDemo.s Ln: 53   - lda	#<$irqHandler
+$0af0: 8d fe ff - File:.\SpriteDemo.s Ln: 54   - sta	$fffe
+$0af3: ad 11 d0 - File:.\SpriteDemo.s Ln: 55   - lda	$d011
+$0af6: 29 7f    - File:.\SpriteDemo.s Ln: 56   - and	#$7f
+$0af8: 09 00    - File:.\SpriteDemo.s Ln: 63   - ora	#((>$scanLine) -shl 7)  //this is clearly wrong.. should be >($scanLine -shl 7), no??!
+$0afa: 8d 11 d0 - File:.\SpriteDemo.s Ln: 64   - sta	$d011
+$0afd: a9 8d    - File:.\SpriteDemo.s Ln: 65   - lda	#<$scanLine
+$0aff: 8d 12 d0 - File:.\SpriteDemo.s Ln: 66   - sta	$d012
+$0b02: a9 8f    - File:.\SpriteDemo.s Ln: 86   - lda	#$8f
+$0b04: 8d 19 d0 - File:.\SpriteDemo.s Ln: 87   - sta	$d019
+$0b07: 40       - File:.\SpriteDemo.s Ln: 88   - rti
+$0b08: 20 00 09 - File:.\SpriteDemo.s Ln: 257  - jsr Stable
+$0b0b: ce 20 d0 - File:.\SpriteDemo.s Ln: 259  - dec	$d020
+$0b0e: ce 21 d0 - File:.\SpriteDemo.s Ln: 260  - dec	$d021
+$0b11: a9 0b    - File:.\SpriteDemo.s Ln: 51   - lda	#>$irqHandler
+$0b13: 8d ff ff - File:.\SpriteDemo.s Ln: 52   - sta	$ffff
+$0b16: a9 32    - File:.\SpriteDemo.s Ln: 53   - lda	#<$irqHandler
+$0b18: 8d fe ff - File:.\SpriteDemo.s Ln: 54   - sta	$fffe
+$0b1b: ad 11 d0 - File:.\SpriteDemo.s Ln: 55   - lda	$d011
+$0b1e: 29 7f    - File:.\SpriteDemo.s Ln: 56   - and	#$7f
+$0b20: ea       - File:.\SpriteDemo.s Ln: 109  - .rep ($num/2) {nop;}
+$0b21: ea       - File:.\SpriteDemo.s Ln: 109  - .rep ($num/2) {nop;}
+$0b22: 09 00    - File:.\SpriteDemo.s Ln: 63   - ora	#((>$scanLine) -shl 7)  //this is clearly wrong.. should be >($scanLine -shl 7), no??!
+$0b24: 8d 11 d0 - File:.\SpriteDemo.s Ln: 64   - sta	$d011
+$0b27: a9 9b    - File:.\SpriteDemo.s Ln: 65   - lda	#<$scanLine
+$0b29: 8d 12 d0 - File:.\SpriteDemo.s Ln: 66   - sta	$d012
+$0b2c: a9 8f    - File:.\SpriteDemo.s Ln: 86   - lda	#$8f
+$0b2e: 8d 19 d0 - File:.\SpriteDemo.s Ln: 87   - sta	$d019
+$0b31: 40       - File:.\SpriteDemo.s Ln: 88   - rti
+$0b32: 20 00 09 - File:.\SpriteDemo.s Ln: 257  - jsr Stable
+$0b35: ce 20 d0 - File:.\SpriteDemo.s Ln: 259  - dec	$d020
+$0b38: ce 21 d0 - File:.\SpriteDemo.s Ln: 260  - dec	$d021
+$0b3b: a9 0b    - File:.\SpriteDemo.s Ln: 51   - lda	#>$irqHandler
+$0b3d: 8d ff ff - File:.\SpriteDemo.s Ln: 52   - sta	$ffff
+$0b40: a9 5a    - File:.\SpriteDemo.s Ln: 53   - lda	#<$irqHandler
+$0b42: 8d fe ff - File:.\SpriteDemo.s Ln: 54   - sta	$fffe
+$0b45: ad 11 d0 - File:.\SpriteDemo.s Ln: 55   - lda	$d011
+$0b48: 29 7f    - File:.\SpriteDemo.s Ln: 56   - and	#$7f
+$0b4a: 09 00    - File:.\SpriteDemo.s Ln: 63   - ora	#((>$scanLine) -shl 7)  //this is clearly wrong.. should be >($scanLine -shl 7), no??!
+$0b4c: 8d 11 d0 - File:.\SpriteDemo.s Ln: 64   - sta	$d011
+$0b4f: a9 a7    - File:.\SpriteDemo.s Ln: 65   - lda	#<$scanLine
+$0b51: 8d 12 d0 - File:.\SpriteDemo.s Ln: 66   - sta	$d012
+$0b54: a9 8f    - File:.\SpriteDemo.s Ln: 86   - lda	#$8f
+$0b56: 8d 19 d0 - File:.\SpriteDemo.s Ln: 87   - sta	$d019
+$0b59: 40       - File:.\SpriteDemo.s Ln: 88   - rti
+$0b5a: 20 00 09 - File:.\SpriteDemo.s Ln: 257  - jsr Stable
+$0b5d: ce 20 d0 - File:.\SpriteDemo.s Ln: 259  - dec	$d020
+$0b60: ce 21 d0 - File:.\SpriteDemo.s Ln: 260  - dec	$d021
+$0b63: a9 0b    - File:.\SpriteDemo.s Ln: 51   - lda	#>$irqHandler
+$0b65: 8d ff ff - File:.\SpriteDemo.s Ln: 52   - sta	$ffff
+$0b68: a9 82    - File:.\SpriteDemo.s Ln: 53   - lda	#<$irqHandler
+$0b6a: 8d fe ff - File:.\SpriteDemo.s Ln: 54   - sta	$fffe
+$0b6d: ad 11 d0 - File:.\SpriteDemo.s Ln: 55   - lda	$d011
+$0b70: 29 7f    - File:.\SpriteDemo.s Ln: 56   - and	#$7f
+$0b72: 09 00    - File:.\SpriteDemo.s Ln: 63   - ora	#((>$scanLine) -shl 7)  //this is clearly wrong.. should be >($scanLine -shl 7), no??!
+$0b74: 8d 11 d0 - File:.\SpriteDemo.s Ln: 64   - sta	$d011
+$0b77: a9 b4    - File:.\SpriteDemo.s Ln: 65   - lda	#<$scanLine
+$0b79: 8d 12 d0 - File:.\SpriteDemo.s Ln: 66   - sta	$d012
+$0b7c: a9 8f    - File:.\SpriteDemo.s Ln: 86   - lda	#$8f
+$0b7e: 8d 19 d0 - File:.\SpriteDemo.s Ln: 87   - sta	$d019
+$0b81: 40       - File:.\SpriteDemo.s Ln: 88   - rti
+$0b82: 20 00 09 - File:.\SpriteDemo.s Ln: 257  - jsr Stable
+$0b85: ce 20 d0 - File:.\SpriteDemo.s Ln: 259  - dec	$d020
+$0b88: ce 21 d0 - File:.\SpriteDemo.s Ln: 260  - dec	$d021
+$0b8b: a9 0b    - File:.\SpriteDemo.s Ln: 51   - lda	#>$irqHandler
+$0b8d: 8d ff ff - File:.\SpriteDemo.s Ln: 52   - sta	$ffff
+$0b90: a9 aa    - File:.\SpriteDemo.s Ln: 53   - lda	#<$irqHandler
+$0b92: 8d fe ff - File:.\SpriteDemo.s Ln: 54   - sta	$fffe
+$0b95: ad 11 d0 - File:.\SpriteDemo.s Ln: 55   - lda	$d011
+$0b98: 29 7f    - File:.\SpriteDemo.s Ln: 56   - and	#$7f
+$0b9a: 09 00    - File:.\SpriteDemo.s Ln: 63   - ora	#((>$scanLine) -shl 7)  //this is clearly wrong.. should be >($scanLine -shl 7), no??!
+$0b9c: 8d 11 d0 - File:.\SpriteDemo.s Ln: 64   - sta	$d011
+$0b9f: a9 c1    - File:.\SpriteDemo.s Ln: 65   - lda	#<$scanLine
+$0ba1: 8d 12 d0 - File:.\SpriteDemo.s Ln: 66   - sta	$d012
+$0ba4: a9 8f    - File:.\SpriteDemo.s Ln: 86   - lda	#$8f
+$0ba6: 8d 19 d0 - File:.\SpriteDemo.s Ln: 87   - sta	$d019
+$0ba9: 40       - File:.\SpriteDemo.s Ln: 88   - rti
+$0baa: 20 00 09 - File:.\SpriteDemo.s Ln: 257  - jsr Stable
+$0bad: ce 20 d0 - File:.\SpriteDemo.s Ln: 259  - dec	$d020
+$0bb0: ce 21 d0 - File:.\SpriteDemo.s Ln: 260  - dec	$d021
+$0bb3: a9 0b    - File:.\SpriteDemo.s Ln: 51   - lda	#>$irqHandler
+$0bb5: 8d ff ff - File:.\SpriteDemo.s Ln: 52   - sta	$ffff
+$0bb8: a9 d2    - File:.\SpriteDemo.s Ln: 53   - lda	#<$irqHandler
+$0bba: 8d fe ff - File:.\SpriteDemo.s Ln: 54   - sta	$fffe
+$0bbd: ad 11 d0 - File:.\SpriteDemo.s Ln: 55   - lda	$d011
+$0bc0: 29 7f    - File:.\SpriteDemo.s Ln: 56   - and	#$7f
+$0bc2: 09 00    - File:.\SpriteDemo.s Ln: 63   - ora	#((>$scanLine) -shl 7)  //this is clearly wrong.. should be >($scanLine -shl 7), no??!
+$0bc4: 8d 11 d0 - File:.\SpriteDemo.s Ln: 64   - sta	$d011
+$0bc7: a9 ce    - File:.\SpriteDemo.s Ln: 65   - lda	#<$scanLine
+$0bc9: 8d 12 d0 - File:.\SpriteDemo.s Ln: 66   - sta	$d012
+$0bcc: a9 8f    - File:.\SpriteDemo.s Ln: 86   - lda	#$8f
+$0bce: 8d 19 d0 - File:.\SpriteDemo.s Ln: 87   - sta	$d019
+$0bd1: 40       - File:.\SpriteDemo.s Ln: 88   - rti
+$0bd2: 20 00 09 - File:.\SpriteDemo.s Ln: 257  - jsr Stable
+$0bd5: ce 20 d0 - File:.\SpriteDemo.s Ln: 259  - dec	$d020
+$0bd8: ce 21 d0 - File:.\SpriteDemo.s Ln: 260  - dec	$d021
+$0bdb: a9 0b    - File:.\SpriteDemo.s Ln: 51   - lda	#>$irqHandler
+$0bdd: 8d ff ff - File:.\SpriteDemo.s Ln: 52   - sta	$ffff
+$0be0: a9 fc    - File:.\SpriteDemo.s Ln: 53   - lda	#<$irqHandler
+$0be2: 8d fe ff - File:.\SpriteDemo.s Ln: 54   - sta	$fffe
+$0be5: ad 11 d0 - File:.\SpriteDemo.s Ln: 55   - lda	$d011
+$0be8: 29 7f    - File:.\SpriteDemo.s Ln: 56   - and	#$7f
+$0bea: ea       - File:.\SpriteDemo.s Ln: 109  - .rep ($num/2) {nop;}
+$0beb: ea       - File:.\SpriteDemo.s Ln: 109  - .rep ($num/2) {nop;}
+$0bec: 09 00    - File:.\SpriteDemo.s Ln: 63   - ora	#((>$scanLine) -shl 7)  //this is clearly wrong.. should be >($scanLine -shl 7), no??!
+$0bee: 8d 11 d0 - File:.\SpriteDemo.s Ln: 64   - sta	$d011
+$0bf1: a9 db    - File:.\SpriteDemo.s Ln: 65   - lda	#<$scanLine
+$0bf3: 8d 12 d0 - File:.\SpriteDemo.s Ln: 66   - sta	$d012
+$0bf6: a9 8f    - File:.\SpriteDemo.s Ln: 86   - lda	#$8f
+$0bf8: 8d 19 d0 - File:.\SpriteDemo.s Ln: 87   - sta	$d019
+$0bfb: 40       - File:.\SpriteDemo.s Ln: 88   - rti
+$0bfc: 20 00 09 - File:.\SpriteDemo.s Ln: 257  - jsr Stable
+$0bff: ce 20 d0 - File:.\SpriteDemo.s Ln: 259  - dec	$d020
+$0c02: ce 21 d0 - File:.\SpriteDemo.s Ln: 260  - dec	$d021
+$0c05: a9 0c    - File:.\SpriteDemo.s Ln: 51   - lda	#>$irqHandler
+$0c07: 8d ff ff - File:.\SpriteDemo.s Ln: 52   - sta	$ffff
+$0c0a: a9 24    - File:.\SpriteDemo.s Ln: 53   - lda	#<$irqHandler
+$0c0c: 8d fe ff - File:.\SpriteDemo.s Ln: 54   - sta	$fffe
+$0c0f: ad 11 d0 - File:.\SpriteDemo.s Ln: 55   - lda	$d011
+$0c12: 29 7f    - File:.\SpriteDemo.s Ln: 56   - and	#$7f
+$0c14: 09 00    - File:.\SpriteDemo.s Ln: 63   - ora	#((>$scanLine) -shl 7)  //this is clearly wrong.. should be >($scanLine -shl 7), no??!
+$0c16: 8d 11 d0 - File:.\SpriteDemo.s Ln: 64   - sta	$d011
+$0c19: a9 e8    - File:.\SpriteDemo.s Ln: 65   - lda	#<$scanLine
+$0c1b: 8d 12 d0 - File:.\SpriteDemo.s Ln: 66   - sta	$d012
+$0c1e: a9 8f    - File:.\SpriteDemo.s Ln: 86   - lda	#$8f
+$0c20: 8d 19 d0 - File:.\SpriteDemo.s Ln: 87   - sta	$d019
+$0c23: 40       - File:.\SpriteDemo.s Ln: 88   - rti
+$0c24: 20 00 09 - File:.\SpriteDemo.s Ln: 257  - jsr Stable
+$0c27: ce 20 d0 - File:.\SpriteDemo.s Ln: 259  - dec	$d020
+$0c2a: ce 21 d0 - File:.\SpriteDemo.s Ln: 260  - dec	$d021
+$0c2d: a9 0c    - File:.\SpriteDemo.s Ln: 51   - lda	#>$irqHandler
+$0c2f: 8d ff ff - File:.\SpriteDemo.s Ln: 52   - sta	$ffff
+$0c32: a9 4c    - File:.\SpriteDemo.s Ln: 53   - lda	#<$irqHandler
+$0c34: 8d fe ff - File:.\SpriteDemo.s Ln: 54   - sta	$fffe
+$0c37: ad 11 d0 - File:.\SpriteDemo.s Ln: 55   - lda	$d011
+$0c3a: 29 7f    - File:.\SpriteDemo.s Ln: 56   - and	#$7f
+$0c3c: 09 00    - File:.\SpriteDemo.s Ln: 63   - ora	#((>$scanLine) -shl 7)  //this is clearly wrong.. should be >($scanLine -shl 7), no??!
+$0c3e: 8d 11 d0 - File:.\SpriteDemo.s Ln: 64   - sta	$d011
+$0c41: a9 f5    - File:.\SpriteDemo.s Ln: 65   - lda	#<$scanLine
+$0c43: 8d 12 d0 - File:.\SpriteDemo.s Ln: 66   - sta	$d012
+$0c46: a9 8f    - File:.\SpriteDemo.s Ln: 86   - lda	#$8f
+$0c48: 8d 19 d0 - File:.\SpriteDemo.s Ln: 87   - sta	$d019
+$0c4b: 40       - File:.\SpriteDemo.s Ln: 88   - rti
+$0c4c: 20 00 09 - File:.\SpriteDemo.s Ln: 257  - jsr Stable
+$0c4f: ce 20 d0 - File:.\SpriteDemo.s Ln: 259  - dec	$d020
+$0c52: ce 21 d0 - File:.\SpriteDemo.s Ln: 260  - dec	$d021
+$0c55: a9 0c    - File:.\SpriteDemo.s Ln: 51   - lda	#>$irqHandler
+$0c57: 8d ff ff - File:.\SpriteDemo.s Ln: 52   - sta	$ffff
+$0c5a: a9 74    - File:.\SpriteDemo.s Ln: 53   - lda	#<$irqHandler
+$0c5c: 8d fe ff - File:.\SpriteDemo.s Ln: 54   - sta	$fffe
+$0c5f: ad 11 d0 - File:.\SpriteDemo.s Ln: 55   - lda	$d011
+$0c62: 29 7f    - File:.\SpriteDemo.s Ln: 56   - and	#$7f
+$0c64: 09 80    - File:.\SpriteDemo.s Ln: 63   - ora	#((>$scanLine) -shl 7)  //this is clearly wrong.. should be >($scanLine -shl 7), no??!
+$0c66: 8d 11 d0 - File:.\SpriteDemo.s Ln: 64   - sta	$d011
+$0c69: a9 00    - File:.\SpriteDemo.s Ln: 65   - lda	#<$scanLine
+$0c6b: 8d 12 d0 - File:.\SpriteDemo.s Ln: 66   - sta	$d012
+$0c6e: a9 8f    - File:.\SpriteDemo.s Ln: 86   - lda	#$8f
+$0c70: 8d 19 d0 - File:.\SpriteDemo.s Ln: 87   - sta	$d019
+$0c73: 40       - File:.\SpriteDemo.s Ln: 88   - rti
+$0c74: ee 20 d0 - File:.\SpriteDemo.s Ln: 264  - inc	$d020
+$0c77: 20 2a 0d - File:.\SpriteDemo.s Ln: 265  - jsr	SpriteUpdate
+$0c7a: ce 20 d0 - File:.\SpriteDemo.s Ln: 266  - dec	$d020
+$0c7d: a9 ff    - File:.\SpriteDemo.s Ln: 267  - lda	#$ff
+$0c7f: 8d 15 d0 - File:.\SpriteDemo.s Ln: 268  - sta	$d015
+$0c82: a9 09    - File:.\SpriteDemo.s Ln: 72   - lda	#>$irqHandler
+$0c84: 8d ff ff - File:.\SpriteDemo.s Ln: 73   - sta	$ffff
+$0c87: a9 cd    - File:.\SpriteDemo.s Ln: 74   - lda	#<$irqHandler
+$0c89: 8d fe ff - File:.\SpriteDemo.s Ln: 75   - sta	$fffe
+$0c8c: ad 11 d0 - File:.\SpriteDemo.s Ln: 76   - lda	$d011
+$0c8f: 29 7f    - File:.\SpriteDemo.s Ln: 77   - and	#$7f
+$0c91: 09 00    - File:.\SpriteDemo.s Ln: 78   - ora	#((>$scanLine) -shl 7)  //this is clearly wrong.. should be >($scanLine -shl 7), no??!
+$0c93: 8d 11 d0 - File:.\SpriteDemo.s Ln: 79   - sta	$d011
+$0c96: a9 0f    - File:.\SpriteDemo.s Ln: 80   - lda	#<$scanLine
+$0c98: 8d 12 d0 - File:.\SpriteDemo.s Ln: 81   - sta	$d012
+$0c9b: a9 8f    - File:.\SpriteDemo.s Ln: 274  - lda	#$8f
+$0c9d: 8d 19 d0 - File:.\SpriteDemo.s Ln: 275  - sta	$d019
+$0ca0: 40       - File:.\SpriteDemo.s Ln: 276  - rti
+$0ca1: a2 35    - File:.\SpriteDemo.s Ln: 283  - ldx	#$35
+$0ca3: a0 90    - File:.\SpriteDemo.s Ln: 284  - ldy	#$90
+$0ca5: 8e 00 d0 - File:.\SpriteDemo.s Ln: 286  - stx	$d000+$i
+$0ca8: 8c 01 d0 - File:.\SpriteDemo.s Ln: 287  - sty	$d001+$i
+$0cab: 8e 02 d0 - File:.\SpriteDemo.s Ln: 286  - stx	$d000+$i
+$0cae: 8c 03 d0 - File:.\SpriteDemo.s Ln: 287  - sty	$d001+$i
+$0cb1: 8e 04 d0 - File:.\SpriteDemo.s Ln: 286  - stx	$d000+$i
+$0cb4: 8c 05 d0 - File:.\SpriteDemo.s Ln: 287  - sty	$d001+$i
+$0cb7: 8e 06 d0 - File:.\SpriteDemo.s Ln: 286  - stx	$d000+$i
+$0cba: 8c 07 d0 - File:.\SpriteDemo.s Ln: 287  - sty	$d001+$i
+$0cbd: 8e 08 d0 - File:.\SpriteDemo.s Ln: 286  - stx	$d000+$i
+$0cc0: 8c 09 d0 - File:.\SpriteDemo.s Ln: 287  - sty	$d001+$i
+$0cc3: 8e 0a d0 - File:.\SpriteDemo.s Ln: 286  - stx	$d000+$i
+$0cc6: 8c 0b d0 - File:.\SpriteDemo.s Ln: 287  - sty	$d001+$i
+$0cc9: 8e 0c d0 - File:.\SpriteDemo.s Ln: 286  - stx	$d000+$i
+$0ccc: 8c 0d d0 - File:.\SpriteDemo.s Ln: 287  - sty	$d001+$i
+$0ccf: 8e 0e d0 - File:.\SpriteDemo.s Ln: 286  - stx	$d000+$i
+$0cd2: 8c 0f d0 - File:.\SpriteDemo.s Ln: 287  - sty	$d001+$i
+$0cd5: a9 c0    - File:.\SpriteDemo.s Ln: 291  - lda	#<((SpriteData % $4000 / $40)+$_)
+$0cd7: 8d f8 07 - File:.\SpriteDemo.s Ln: 292  - sta	$0400+$03f8+$_
+$0cda: a9 c1    - File:.\SpriteDemo.s Ln: 291  - lda	#<((SpriteData % $4000 / $40)+$_)
+$0cdc: 8d f9 07 - File:.\SpriteDemo.s Ln: 292  - sta	$0400+$03f8+$_
+$0cdf: a9 c2    - File:.\SpriteDemo.s Ln: 291  - lda	#<((SpriteData % $4000 / $40)+$_)
+$0ce1: 8d fa 07 - File:.\SpriteDemo.s Ln: 292  - sta	$0400+$03f8+$_
+$0ce4: a9 c3    - File:.\SpriteDemo.s Ln: 291  - lda	#<((SpriteData % $4000 / $40)+$_)
+$0ce6: 8d fb 07 - File:.\SpriteDemo.s Ln: 292  - sta	$0400+$03f8+$_
+$0ce9: a9 c4    - File:.\SpriteDemo.s Ln: 291  - lda	#<((SpriteData % $4000 / $40)+$_)
+$0ceb: 8d fc 07 - File:.\SpriteDemo.s Ln: 292  - sta	$0400+$03f8+$_
+$0cee: a9 c5    - File:.\SpriteDemo.s Ln: 291  - lda	#<((SpriteData % $4000 / $40)+$_)
+$0cf0: 8d fd 07 - File:.\SpriteDemo.s Ln: 292  - sta	$0400+$03f8+$_
+$0cf3: a9 c6    - File:.\SpriteDemo.s Ln: 291  - lda	#<((SpriteData % $4000 / $40)+$_)
+$0cf5: 8d fe 07 - File:.\SpriteDemo.s Ln: 292  - sta	$0400+$03f8+$_
+$0cf8: a9 c7    - File:.\SpriteDemo.s Ln: 291  - lda	#<((SpriteData % $4000 / $40)+$_)
+$0cfa: 8d ff 07 - File:.\SpriteDemo.s Ln: 292  - sta	$0400+$03f8+$_
+$0cfd: a9 0e    - File:.\SpriteDemo.s Ln: 295  - lda	#14
+$0cff: 8d 25 d0 - File:.\SpriteDemo.s Ln: 296  - sta	$d025		//Sprite Multicolor 0
+$0d02: a9 07    - File:.\SpriteDemo.s Ln: 297  - lda	#7
+$0d04: 8d 26 d0 - File:.\SpriteDemo.s Ln: 298  - sta	$d026		//Sprite Multicolor 1
+$0d07: a9 01    - File:.\SpriteDemo.s Ln: 299  - lda	#1
+$0d09: 8d 27 d0 - File:.\SpriteDemo.s Ln: 300  - sta	$d027		//Sprite 0 color
+$0d0c: 8d 28 d0 - File:.\SpriteDemo.s Ln: 301  - sta	$d028		//..1..
+$0d0f: 8d 29 d0 - File:.\SpriteDemo.s Ln: 302  - sta	$d029		//
+$0d12: 8d 2a d0 - File:.\SpriteDemo.s Ln: 303  - sta	$d02a
+$0d15: 8d 2b d0 - File:.\SpriteDemo.s Ln: 304  - sta	$d02b
+$0d18: 8d 2c d0 - File:.\SpriteDemo.s Ln: 305  - sta	$d02c
+$0d1b: 8d 2d d0 - File:.\SpriteDemo.s Ln: 306  - sta	$d02d
+$0d1e: 8d 2e d0 - File:.\SpriteDemo.s Ln: 307  - sta	$d02e
+$0d21: a9 ff    - File:.\SpriteDemo.s Ln: 309  - lda	#$ff
+$0d23: 8d 15 d0 - File:.\SpriteDemo.s Ln: 310  - sta	$d015
+$0d26: 8d 1c d0 - File:.\SpriteDemo.s Ln: 311  - sta	$d01c		//Sprite Multicolor
+$0d29: 60       - File:.\SpriteDemo.s Ln: 312  - rts
+$0d2a: ae 9b 0e - File:.\SpriteDemo.s Ln: 315  - ldx	sprxpos+$spr
+$0d2d: bd bb 0e - File:.\SpriteDemo.s Ln: 316  - lda	XDataLo,x
+$0d30: 8d 00 d0 - File:.\SpriteDemo.s Ln: 317  - sta	$d000+$spr*2
+$0d33: bd bb 0f - File:.\SpriteDemo.s Ln: 318  - lda	XDataHi,x
+$0d36: a8       - File:.\SpriteDemo.s Ln: 319  - tay
+$0d37: ad 10 d0 - File:.\SpriteDemo.s Ln: 320  - lda	$d010
+$0d3a: 2d b3 0e - File:.\SpriteDemo.s Ln: 321  - and	tabd010and+$spr
+$0d3d: 19 a3 0e - File:.\SpriteDemo.s Ln: 322  - ora	tabd010or+$spr*2,y
+$0d40: 8d 10 d0 - File:.\SpriteDemo.s Ln: 323  - sta	$d010
+$0d43: e8       - File:.\SpriteDemo.s Ln: 324  - inx
+$0d44: e8       - File:.\SpriteDemo.s Ln: 325  - inx
+$0d45: 8e 9b 0e - File:.\SpriteDemo.s Ln: 326  - stx	sprxpos+$spr
+$0d48: ac 93 0e - File:.\SpriteDemo.s Ln: 328  - ldy	sprypos+$spr
+$0d4b: b9 bb 10 - File:.\SpriteDemo.s Ln: 329  - lda	YDataLo,y
+$0d4e: 8d 01 d0 - File:.\SpriteDemo.s Ln: 330  - sta	$d001+$spr*2
+$0d51: c8       - File:.\SpriteDemo.s Ln: 331  - iny
+$0d52: c8       - File:.\SpriteDemo.s Ln: 332  - iny
+$0d53: c8       - File:.\SpriteDemo.s Ln: 333  - iny
+$0d54: 8c 93 0e - File:.\SpriteDemo.s Ln: 334  - sty	sprypos+$spr
+$0d57: ae 9c 0e - File:.\SpriteDemo.s Ln: 315  - ldx	sprxpos+$spr
+$0d5a: bd bb 0e - File:.\SpriteDemo.s Ln: 316  - lda	XDataLo,x
+$0d5d: 8d 02 d0 - File:.\SpriteDemo.s Ln: 317  - sta	$d000+$spr*2
+$0d60: bd bb 0f - File:.\SpriteDemo.s Ln: 318  - lda	XDataHi,x
+$0d63: a8       - File:.\SpriteDemo.s Ln: 319  - tay
+$0d64: ad 10 d0 - File:.\SpriteDemo.s Ln: 320  - lda	$d010
+$0d67: 2d b4 0e - File:.\SpriteDemo.s Ln: 321  - and	tabd010and+$spr
+$0d6a: 19 a5 0e - File:.\SpriteDemo.s Ln: 322  - ora	tabd010or+$spr*2,y
+$0d6d: 8d 10 d0 - File:.\SpriteDemo.s Ln: 323  - sta	$d010
+$0d70: e8       - File:.\SpriteDemo.s Ln: 324  - inx
+$0d71: e8       - File:.\SpriteDemo.s Ln: 325  - inx
+$0d72: 8e 9c 0e - File:.\SpriteDemo.s Ln: 326  - stx	sprxpos+$spr
+$0d75: ac 94 0e - File:.\SpriteDemo.s Ln: 328  - ldy	sprypos+$spr
+$0d78: b9 bb 10 - File:.\SpriteDemo.s Ln: 329  - lda	YDataLo,y
+$0d7b: 8d 03 d0 - File:.\SpriteDemo.s Ln: 330  - sta	$d001+$spr*2
+$0d7e: c8       - File:.\SpriteDemo.s Ln: 331  - iny
+$0d7f: c8       - File:.\SpriteDemo.s Ln: 332  - iny
+$0d80: c8       - File:.\SpriteDemo.s Ln: 333  - iny
+$0d81: 8c 94 0e - File:.\SpriteDemo.s Ln: 334  - sty	sprypos+$spr
+$0d84: ae 9d 0e - File:.\SpriteDemo.s Ln: 315  - ldx	sprxpos+$spr
+$0d87: bd bb 0e - File:.\SpriteDemo.s Ln: 316  - lda	XDataLo,x
+$0d8a: 8d 04 d0 - File:.\SpriteDemo.s Ln: 317  - sta	$d000+$spr*2
+$0d8d: bd bb 0f - File:.\SpriteDemo.s Ln: 318  - lda	XDataHi,x
+$0d90: a8       - File:.\SpriteDemo.s Ln: 319  - tay
+$0d91: ad 10 d0 - File:.\SpriteDemo.s Ln: 320  - lda	$d010
+$0d94: 2d b5 0e - File:.\SpriteDemo.s Ln: 321  - and	tabd010and+$spr
+$0d97: 19 a7 0e - File:.\SpriteDemo.s Ln: 322  - ora	tabd010or+$spr*2,y
+$0d9a: 8d 10 d0 - File:.\SpriteDemo.s Ln: 323  - sta	$d010
+$0d9d: e8       - File:.\SpriteDemo.s Ln: 324  - inx
+$0d9e: e8       - File:.\SpriteDemo.s Ln: 325  - inx
+$0d9f: 8e 9d 0e - File:.\SpriteDemo.s Ln: 326  - stx	sprxpos+$spr
+$0da2: ac 95 0e - File:.\SpriteDemo.s Ln: 328  - ldy	sprypos+$spr
+$0da5: b9 bb 10 - File:.\SpriteDemo.s Ln: 329  - lda	YDataLo,y
+$0da8: 8d 05 d0 - File:.\SpriteDemo.s Ln: 330  - sta	$d001+$spr*2
+$0dab: c8       - File:.\SpriteDemo.s Ln: 331  - iny
+$0dac: c8       - File:.\SpriteDemo.s Ln: 332  - iny
+$0dad: c8       - File:.\SpriteDemo.s Ln: 333  - iny
+$0dae: 8c 95 0e - File:.\SpriteDemo.s Ln: 334  - sty	sprypos+$spr
+$0db1: ae 9e 0e - File:.\SpriteDemo.s Ln: 315  - ldx	sprxpos+$spr
+$0db4: bd bb 0e - File:.\SpriteDemo.s Ln: 316  - lda	XDataLo,x
+$0db7: 8d 06 d0 - File:.\SpriteDemo.s Ln: 317  - sta	$d000+$spr*2
+$0dba: bd bb 0f - File:.\SpriteDemo.s Ln: 318  - lda	XDataHi,x
+$0dbd: a8       - File:.\SpriteDemo.s Ln: 319  - tay
+$0dbe: ad 10 d0 - File:.\SpriteDemo.s Ln: 320  - lda	$d010
+$0dc1: 2d b6 0e - File:.\SpriteDemo.s Ln: 321  - and	tabd010and+$spr
+$0dc4: 19 a9 0e - File:.\SpriteDemo.s Ln: 322  - ora	tabd010or+$spr*2,y
+$0dc7: 8d 10 d0 - File:.\SpriteDemo.s Ln: 323  - sta	$d010
+$0dca: e8       - File:.\SpriteDemo.s Ln: 324  - inx
+$0dcb: e8       - File:.\SpriteDemo.s Ln: 325  - inx
+$0dcc: 8e 9e 0e - File:.\SpriteDemo.s Ln: 326  - stx	sprxpos+$spr
+$0dcf: ac 96 0e - File:.\SpriteDemo.s Ln: 328  - ldy	sprypos+$spr
+$0dd2: b9 bb 10 - File:.\SpriteDemo.s Ln: 329  - lda	YDataLo,y
+$0dd5: 8d 07 d0 - File:.\SpriteDemo.s Ln: 330  - sta	$d001+$spr*2
+$0dd8: c8       - File:.\SpriteDemo.s Ln: 331  - iny
+$0dd9: c8       - File:.\SpriteDemo.s Ln: 332  - iny
+$0dda: c8       - File:.\SpriteDemo.s Ln: 333  - iny
+$0ddb: 8c 96 0e - File:.\SpriteDemo.s Ln: 334  - sty	sprypos+$spr
+$0dde: ae 9f 0e - File:.\SpriteDemo.s Ln: 315  - ldx	sprxpos+$spr
+$0de1: bd bb 0e - File:.\SpriteDemo.s Ln: 316  - lda	XDataLo,x
+$0de4: 8d 08 d0 - File:.\SpriteDemo.s Ln: 317  - sta	$d000+$spr*2
+$0de7: bd bb 0f - File:.\SpriteDemo.s Ln: 318  - lda	XDataHi,x
+$0dea: a8       - File:.\SpriteDemo.s Ln: 319  - tay
+$0deb: ad 10 d0 - File:.\SpriteDemo.s Ln: 320  - lda	$d010
+$0dee: 2d b7 0e - File:.\SpriteDemo.s Ln: 321  - and	tabd010and+$spr
+$0df1: 19 ab 0e - File:.\SpriteDemo.s Ln: 322  - ora	tabd010or+$spr*2,y
+$0df4: 8d 10 d0 - File:.\SpriteDemo.s Ln: 323  - sta	$d010
+$0df7: e8       - File:.\SpriteDemo.s Ln: 324  - inx
+$0df8: e8       - File:.\SpriteDemo.s Ln: 325  - inx
+$0df9: 8e 9f 0e - File:.\SpriteDemo.s Ln: 326  - stx	sprxpos+$spr
+$0dfc: ac 97 0e - File:.\SpriteDemo.s Ln: 328  - ldy	sprypos+$spr
+$0dff: b9 bb 10 - File:.\SpriteDemo.s Ln: 329  - lda	YDataLo,y
+$0e02: 8d 09 d0 - File:.\SpriteDemo.s Ln: 330  - sta	$d001+$spr*2
+$0e05: c8       - File:.\SpriteDemo.s Ln: 331  - iny
+$0e06: c8       - File:.\SpriteDemo.s Ln: 332  - iny
+$0e07: c8       - File:.\SpriteDemo.s Ln: 333  - iny
+$0e08: 8c 97 0e - File:.\SpriteDemo.s Ln: 334  - sty	sprypos+$spr
+$0e0b: ae a0 0e - File:.\SpriteDemo.s Ln: 315  - ldx	sprxpos+$spr
+$0e0e: bd bb 0e - File:.\SpriteDemo.s Ln: 316  - lda	XDataLo,x
+$0e11: 8d 0a d0 - File:.\SpriteDemo.s Ln: 317  - sta	$d000+$spr*2
+$0e14: bd bb 0f - File:.\SpriteDemo.s Ln: 318  - lda	XDataHi,x
+$0e17: a8       - File:.\SpriteDemo.s Ln: 319  - tay
+$0e18: ad 10 d0 - File:.\SpriteDemo.s Ln: 320  - lda	$d010
+$0e1b: 2d b8 0e - File:.\SpriteDemo.s Ln: 321  - and	tabd010and+$spr
+$0e1e: 19 ad 0e - File:.\SpriteDemo.s Ln: 322  - ora	tabd010or+$spr*2,y
+$0e21: 8d 10 d0 - File:.\SpriteDemo.s Ln: 323  - sta	$d010
+$0e24: e8       - File:.\SpriteDemo.s Ln: 324  - inx
+$0e25: e8       - File:.\SpriteDemo.s Ln: 325  - inx
+$0e26: 8e a0 0e - File:.\SpriteDemo.s Ln: 326  - stx	sprxpos+$spr
+$0e29: ac 98 0e - File:.\SpriteDemo.s Ln: 328  - ldy	sprypos+$spr
+$0e2c: b9 bb 10 - File:.\SpriteDemo.s Ln: 329  - lda	YDataLo,y
+$0e2f: 8d 0b d0 - File:.\SpriteDemo.s Ln: 330  - sta	$d001+$spr*2
+$0e32: c8       - File:.\SpriteDemo.s Ln: 331  - iny
+$0e33: c8       - File:.\SpriteDemo.s Ln: 332  - iny
+$0e34: c8       - File:.\SpriteDemo.s Ln: 333  - iny
+$0e35: 8c 98 0e - File:.\SpriteDemo.s Ln: 334  - sty	sprypos+$spr
+$0e38: ae a1 0e - File:.\SpriteDemo.s Ln: 315  - ldx	sprxpos+$spr
+$0e3b: bd bb 0e - File:.\SpriteDemo.s Ln: 316  - lda	XDataLo,x
+$0e3e: 8d 0c d0 - File:.\SpriteDemo.s Ln: 317  - sta	$d000+$spr*2
+$0e41: bd bb 0f - File:.\SpriteDemo.s Ln: 318  - lda	XDataHi,x
+$0e44: a8       - File:.\SpriteDemo.s Ln: 319  - tay
+$0e45: ad 10 d0 - File:.\SpriteDemo.s Ln: 320  - lda	$d010
+$0e48: 2d b9 0e - File:.\SpriteDemo.s Ln: 321  - and	tabd010and+$spr
+$0e4b: 19 af 0e - File:.\SpriteDemo.s Ln: 322  - ora	tabd010or+$spr*2,y
+$0e4e: 8d 10 d0 - File:.\SpriteDemo.s Ln: 323  - sta	$d010
+$0e51: e8       - File:.\SpriteDemo.s Ln: 324  - inx
+$0e52: e8       - File:.\SpriteDemo.s Ln: 325  - inx
+$0e53: 8e a1 0e - File:.\SpriteDemo.s Ln: 326  - stx	sprxpos+$spr
+$0e56: ac 99 0e - File:.\SpriteDemo.s Ln: 328  - ldy	sprypos+$spr
+$0e59: b9 bb 10 - File:.\SpriteDemo.s Ln: 329  - lda	YDataLo,y
+$0e5c: 8d 0d d0 - File:.\SpriteDemo.s Ln: 330  - sta	$d001+$spr*2
+$0e5f: c8       - File:.\SpriteDemo.s Ln: 331  - iny
+$0e60: c8       - File:.\SpriteDemo.s Ln: 332  - iny
+$0e61: c8       - File:.\SpriteDemo.s Ln: 333  - iny
+$0e62: 8c 99 0e - File:.\SpriteDemo.s Ln: 334  - sty	sprypos+$spr
+$0e65: ae a2 0e - File:.\SpriteDemo.s Ln: 315  - ldx	sprxpos+$spr
+$0e68: bd bb 0e - File:.\SpriteDemo.s Ln: 316  - lda	XDataLo,x
+$0e6b: 8d 0e d0 - File:.\SpriteDemo.s Ln: 317  - sta	$d000+$spr*2
+$0e6e: bd bb 0f - File:.\SpriteDemo.s Ln: 318  - lda	XDataHi,x
+$0e71: a8       - File:.\SpriteDemo.s Ln: 319  - tay
+$0e72: ad 10 d0 - File:.\SpriteDemo.s Ln: 320  - lda	$d010
+$0e75: 2d ba 0e - File:.\SpriteDemo.s Ln: 321  - and	tabd010and+$spr
+$0e78: 19 b1 0e - File:.\SpriteDemo.s Ln: 322  - ora	tabd010or+$spr*2,y
+$0e7b: 8d 10 d0 - File:.\SpriteDemo.s Ln: 323  - sta	$d010
+$0e7e: e8       - File:.\SpriteDemo.s Ln: 324  - inx
+$0e7f: e8       - File:.\SpriteDemo.s Ln: 325  - inx
+$0e80: 8e a2 0e - File:.\SpriteDemo.s Ln: 326  - stx	sprxpos+$spr
+$0e83: ac 9a 0e - File:.\SpriteDemo.s Ln: 328  - ldy	sprypos+$spr
+$0e86: b9 bb 10 - File:.\SpriteDemo.s Ln: 329  - lda	YDataLo,y
+$0e89: 8d 0f d0 - File:.\SpriteDemo.s Ln: 330  - sta	$d001+$spr*2
+$0e8c: c8       - File:.\SpriteDemo.s Ln: 331  - iny
+$0e8d: c8       - File:.\SpriteDemo.s Ln: 332  - iny
+$0e8e: c8       - File:.\SpriteDemo.s Ln: 333  - iny
+$0e8f: 8c 9a 0e - File:.\SpriteDemo.s Ln: 334  - sty	sprypos+$spr
+$0e92: 60       - File:.\SpriteDemo.s Ln: 339  - rts
+$0e93: 46 3c 32 28 1e 14 0a 00 - File:.\SpriteDemo.s Ln: 343  - sprypos:	.byte 	70,60,50,40,30,20,10,0
+$0e9b: 46 3c 32 28 1e 14 0a 00 - File:.\SpriteDemo.s Ln: 344  - sprxpos:	.byte 	70,60,50,40,30,20,10,0
+$0ea3: 00 01 00 02 00 04 00 08 00 10 00 20 00 40 00 80 - File:.\SpriteDemo.s Ln: 345  - tabd010or:	.byte 	0,1,0,2,0,4,0,8,0,16,0,32,0,64,0,128
+$0eb3: fe fd fb f7 ef df bf 7f - File:.\SpriteDemo.s Ln: 346  - tabd010and:	.byte	$fe,$fd,$fb,$f7,$ef,$df,$bf,$7f
+$0ebb: 18 18 18 18 19 19 1a 1a 1b 1c 1c 1d 1e 1f 21 22 
+       23 25 26 28 29 2b 2d 2f 31 33 35 37 3a 3c 3e 41 
+       43 46 49 4b 4e 51 54 57 5a 5d 60 63 66 69 6d 70 
+       73 77 7a 7e 81 85 88 8c 8f 93 96 9a 9d a1 a5 a8 
+       ac b0 b3 b7 bb be c2 c5 c9 cc d0 d3 d7 da de e1 
+       e5 e8 eb ef f2 f5 f8 fb fe 01 04 07 0a 0d 0f 12 
+       15 17 1a 1c 1e 21 23 25 27 29 2b 2d 2f 30 32 33 
+       35 36 37 39 3a 3b 3c 3c 3d 3e 3e 3f 3f 40 40 40 
+       40 40 40 40 3f 3f 3e 3e 3d 3c 3c 3b 3a 39 37 36 
+       35 33 32 30 2f 2d 2b 29 27 25 23 21 1e 1c 1a 17 
+       15 12 0f 0d 0a 07 04 01 fe fb f8 f5 f2 ef eb e8 
+       e5 e1 de da d7 d3 d0 cc c9 c5 c2 be bb b7 b3 b0 
+       ac a8 a5 a1 9d 9a 96 93 8f 8c 88 85 81 7e 7a 77 
+       73 70 6d 69 66 63 60 5d 5a 57 54 51 4e 4b 49 46 
+       43 41 3e 3c 3a 37 35 33 31 2f 2d 2b 29 28 26 25 
+       23 22 21 1f 1e 1d 1c 1c 1b 1a 1a 19 19 18 18 18 - File:.\SpriteDemo.s Ln: 353  - XDataLo:	.fill $sinLen {<($sinStart+[math]::round($sinAmp/2+$sinAmp/2*[math]::sin((($_+$sinOffset)*360/$sinLen)*[math]::PI/180)))}
+$0fbb: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+       00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+       00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+       00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+       00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+       00 00 00 00 00 00 00 00 00 01 01 01 01 01 01 01 
+       01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 
+       01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 
+       01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 
+       01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 
+       01 01 01 01 01 01 01 01 00 00 00 00 00 00 00 00 
+       00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+       00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+       00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+       00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+       00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 - File:.\SpriteDemo.s Ln: 354  - XDataHi:	.fill $sinLen {>($sinStart+[math]::round($sinAmp/2+$sinAmp/2*[math]::sin((($_+$sinOffset)*360/$sinLen)*[math]::PI/180)))}
+$10bb: 32 32 32 32 32 33 33 33 34 34 35 35 36 37 37 38 
+       39 3a 3b 3c 3d 3e 3f 40 41 42 44 45 46 48 49 4b 
+       4c 4e 4f 51 53 54 56 58 5a 5c 5d 5f 61 63 65 67 
+       69 6b 6d 6f 72 74 76 78 7a 7c 7e 81 83 85 87 89 
+       8b 8e 90 92 94 96 99 9b 9d 9f a1 a3 a5 a8 aa ac 
+       ae b0 b2 b4 b6 b8 ba bb bd bf c1 c3 c4 c6 c8 c9 
+       cb cc ce cf d1 d2 d3 d5 d6 d7 d8 d9 da db dc dd 
+       de df e0 e0 e1 e2 e2 e3 e3 e4 e4 e4 e5 e5 e5 e5 
+       e5 e5 e5 e5 e5 e4 e4 e4 e3 e3 e2 e2 e1 e0 e0 df 
+       de dd dc db da d9 d8 d7 d6 d5 d3 d2 d1 cf ce cc 
+       cb c9 c8 c6 c4 c3 c1 bf bd bb ba b8 b6 b4 b2 b0 
+       ae ac aa a8 a5 a3 a1 9f 9d 9b 99 96 94 92 90 8e 
+       8c 89 87 85 83 81 7e 7c 7a 78 76 74 72 6f 6d 6b 
+       69 67 65 63 61 5f 5d 5c 5a 58 56 54 53 51 4f 4e 
+       4c 4b 49 48 46 45 44 42 41 40 3f 3e 3d 3c 3b 3a 
+       39 38 37 37 36 35 35 34 34 33 33 33 32 32 32 32 - File:.\SpriteDemo.s Ln: 361  - YDataLo:	.fill $sinLen {<($sinStart+[math]::round($sinAmp/2+$sinAmp/2*[math]::sin((($_+$sinOffset)*360/$sinLen)*[math]::PI/180)))}
+$3000: 0a aa a0 25 55 58 25 55 58 95 69 56 95 82 56 95 
+       82 56 95 82 56 95 69 56 95 55 56 95 55 56 9f f5 
+       7e bf ff fe bf aa fe bf 82 fe bf 82 fe bf 82 fe 
+       bf 82 fe bf 82 fe bf 82 fe bf 82 fe 2a 00 a8 00 
+       2a 00 a8 95 82 56 95 82 56 95 62 56 95 62 56 95 
+       5a 56 95 5a 56 95 56 56 95 55 56 95 f5 56 bf fd 
+       7e bf ff fe bf ff fe bf bf fe bf af fe bf af fe 
+       bf 8b fe bf 8b fe bf 82 fe bf 82 fe 2a 00 a8 00 
+       0a aa a0 25 55 58 25 55 58 95 55 56 95 55 56 95 
+       55 56 95 59 56 95 62 a8 95 60 00 9f 60 00 bf e0 
+       00 bf e0 00 bf e0 00 bf e2 a8 bf fb fe bf ff fe 
+       bf ff fe bf ff fe 2f ff f8 2f ff f8 0a aa a0 00 
+       2a aa a8 95 55 56 95 55 56 95 55 56 95 55 56 2a 
+       55 a8 02 96 80 00 96 00 00 96 00 00 96 00 00 9e 
+       00 00 be 00 00 be 00 00 be 00 02 be 80 2a ff a8 
+       bf ff fe bf ff fe bf ff fe bf ff fe 2a aa a8 00 
+       2a aa a8 95 55 56 95 55 56 95 55 56 95 55 56 95 
+       55 56 95 6a a8 95 80 00 95 6a 00 9d 55 80 bf d7 
+       80 bf ff 80 bf ea 00 bf 80 00 bf ea a8 bf ff fe 
+       bf ff fe bf ff fe bf ff fe bf ff fe 2a aa a8 00 
+       2a 00 a8 95 82 56 95 82 56 95 62 56 95 62 56 95 
+       5a 56 95 5a 56 95 56 56 95 55 56 97 f5 56 9f ff 
+       fe bf ff fe bf ff fe bf bf fe bf af fe bf af fe 
+       bf 8b fe bf 8b fe bf 82 fe bf 82 fe 2a 00 a8 00 
+       2a aa a8 95 55 56 95 55 56 95 55 56 95 55 56 95 
+       55 56 95 55 56 29 55 68 02 55 80 02 55 80 02 5f 
+       80 02 ff 80 02 ff 80 02 ff 80 02 ff 80 02 ff 80 
+       02 ff 80 02 ff 80 02 ff 80 02 ff 80 00 aa 00 00 
+       2a aa a8 95 55 56 95 55 56 95 55 56 95 55 56 95 
+       aa a8 96 00 00 95 aa a8 95 55 56 95 d5 f6 bf ff 
+       fe bf ff fe 2a aa fe 00 00 be 2a aa fe bf ff fe 
+       bf ff fe bf ff fe bf ff fe bf ff fe 2a aa a8 00 - File:.\SpriteDemo.s Ln: 402  - .byte	$data
+
