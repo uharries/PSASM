@@ -3,6 +3,9 @@ class Tokenizer {
     [System.Collections.Generic.List[char]]$InputData
 	[int]$cpos
 	[int]$tokenStart
+	[int]$tline
+	[int]$tcolumn
+	[string]$tfile
 	[System.Collections.Generic.List[Object]]$tokens # Apparently the <T> needs to be Object, if the type is custom - can be of custom type when the object is initialized
 	[System.Collections.Generic.Stack[int]]$ScopeStack
 	[MultiLevelCounter]$classCounter
@@ -54,9 +57,9 @@ class Tokenizer {
 	[char] PeekChar() {
 		# Ensure InputData has at least one char
 		if ($this.cpos -ge $this.InputData.Count) {
-			$ch = $this.FileStack.ReadChar()
+			$ch = $this.FileStack.PeekChar()
 			if ($ch -eq 0) { return 0 }   # EOF sentinel
-			$this.InputData.Add($ch)
+			return $ch
 		}
 		return $this.InputData[$this.cpos] # same index, no increment
 	}
@@ -66,10 +69,10 @@ class Tokenizer {
 	}
 
 	[char] GetChar() {
-		# Ensure InputData has at least one char
+		# Always run ReadChar() to update counters in file context class
+		$ch = $this.FileStack.ReadChar()
+		if ($ch -eq 0) { return 0 }
 		if ($this.cpos -ge $this.InputData.Count) {
-			$ch = $this.FileStack.ReadChar()
-			if ($ch -eq 0) { return 0 }
 			$this.InputData.Add($ch)
 		}
 		return $this.InputData[$this.cpos++]
@@ -77,12 +80,12 @@ class Tokenizer {
 
 	[void] UnGetChar() {
 		if ($this.cpos -gt 0) {
+			$this.FileStack.UnReadChar()
 			$this.cpos--
 		}
 	}
 
 	[Token] NewToken([TokenType]$tokenType) {
-		$ctx = $this.FileStack.CurrentContext()
 		$lexeme = ($this.InputData[$this.tokenStart..($this.cpos-1)] -join '')
 
 		$token = [Token]::new(
@@ -90,9 +93,9 @@ class Tokenizer {
 			$lexeme,
 			$this.tokenStart,
 			($this.cpos - $this.tokenStart),
-			$ctx.Line,
-			$ctx.Column,
-			$ctx.File
+			$this.tline,
+			$this.tcolumn,
+			$this.tfile
 		)
 
 		return $token
@@ -295,6 +298,10 @@ class Tokenizer {
 
 	[Token] NextToken() {
 		$this.tokenStart = $this.cpos
+		$ctx = $this.FileStack.CurrentContext()
+		$this.tline = $ctx.Line
+		$this.tcolumn = $ctx.Column
+		$this.tfile = $ctx.File
 		[char]$c = $this.GetChar()
 		switch($c) {
 			'/' {
@@ -429,9 +436,11 @@ class Tokenizer {
 				return $this.ScanNumber()
 			}
 			'$' {
-				$i=-1
-				while($this.tokens[$i].Type -notin $null, [TokenType]::SemiColon, [TokenType]::NewLine){
-					if($this.tokens[$i--].Type -in [TokenType]::Mnemonic, [TokenType]::Directive) {
+				### No good way in the tokenizer to detect all the valid places a $xxxx number could exist
+				### e.g. as parameters in macros, so for now just treat $xxxx anywhere as a hex number
+				# $i=-1
+				# while($this.tokens[$i].Type -notin $null, [TokenType]::SemiColon, [TokenType]::NewLine){
+				# 	if($this.tokens[$i--].Type -in [TokenType]::Mnemonic, [TokenType]::Directive) {
 						$cnt=0
 						while($this.GetChar() -in $script:CharsHex) {$cnt++}
 						$this.UnGetChar()
@@ -440,8 +449,8 @@ class Tokenizer {
 						} else {
 							# return $this.ScanVariable()
 						}
-					}
-				}
+				# 	}
+				# }
 				return $this.ScanVariable()
 			}
 			'?' {

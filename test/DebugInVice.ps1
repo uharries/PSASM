@@ -8,7 +8,7 @@ $moncommandsFile = ".\test\moncommands.txt"
 $labels = gc -Path $labelFile
 
 foreach ($l in $labels) {
-	if ($l -match '([0-9a-f]+)\s.breakpoint') {
+	if ($l -match '([0-9a-f]+)\s\.breakpoint') {
 		$breakpoints += "break {0}`n" -f $Matches[1]
 	}
 }

@@ -4,7 +4,10 @@ function .text {
 		[Parameter(Mandatory)]
 		$text,
 
-		[switch]$AsPETSCII
+		[switch]$AsPETSCII,
+
+		[string]$InvocationFile,
+		[int]$InvocationLine
 	)
 
 	[byte[]]$values = @()
@@ -31,7 +34,7 @@ function .text {
 		}
 	}
 
-	$pasm.DataAdd($values, $MyInvocation)
+	$pasm.DataAdd($values, $InvocationFile, $InvocationLine)
 }
 
 # function .petscii { .text $args -AsPETSCII }

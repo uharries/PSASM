@@ -1,4 +1,5 @@
 class InputFileStack {
+	[System.Collections.Generic.List[InputFileContext]]$AllContexts = [System.Collections.Generic.List[InputFileContext]]::new()
 	[System.Collections.Generic.Stack[Object]]$Stack = [System.Collections.Generic.Stack[InputFileContext]]::new()
 	[System.Collections.Generic.HashSet[string]]$IncludeOnceFiles = [System.Collections.Generic.HashSet[string]]::new()
 
@@ -47,12 +48,15 @@ class InputFileStack {
 		}
 
 		$ctx = [InputFileContext]::new($resolved)
+		$this.AllContexts.Add($ctx)
 		$this.Stack.Push($ctx)
 	}
 
 
 	[void] PushVirtualFile([string]$filename, [string]$content) {
-		$this.Stack.Push([InputFileContext]::new($filename, $content))
+		$ctx = [InputFileContext]::new($filename, $content)
+		$this.AllContexts.Add($ctx)
+		$this.Stack.Push($ctx)
 	}
 
 	[void] PopFile() {
@@ -60,6 +64,16 @@ class InputFileStack {
 			$ctx = $this.Stack.Pop()
 			$ctx.Close()
 		}
+	}
+
+	[char] PeekChar() {
+		while ($this.Stack.Count -gt 0) {
+			$ctx = $this.Stack.Peek()
+			$char = $ctx.PeekChar()
+			if ($char -ne 0) { return $char }
+			else { $this.PopFile() }
+		}
+		return 0
 	}
 
 	[char] ReadChar() {
@@ -70,6 +84,13 @@ class InputFileStack {
 			else { $this.PopFile() }
 		}
 		return 0
+	}
+
+	[void] UnReadChar() {
+		if ($this.Stack.Count -gt 0) {
+			$ctx = $this.Stack.Peek()
+			$ctx.UnReadChar()
+		}
 	}
 
 	[object] CurrentContext() {

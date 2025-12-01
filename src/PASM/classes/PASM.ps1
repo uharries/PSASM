@@ -28,6 +28,7 @@ class PASM {
 	[Scope[]]$scopes
 	[hashtable]$Macros = [ordered] @{0 = [ordered] @{ BRA = {param($addr)jmp $addr}}} # [ScopeID][Name] = [ScriptBlock]
 	[InputFileStack]$FileStack
+	[HashTable]$SourceLines
 
 	PASM() {
 		$this.Init()
@@ -38,6 +39,23 @@ class PASM {
 		$this.loadAddress = 0x0000
 		$this.assembly = [System.Collections.ArrayList]@()
 		$this.FileStack = [InputFileStack]::new()
+		$this.SourceLines = @{}
+	}
+
+	[void] BuildSourceLines() {
+		foreach ($ctx in $this.FileStack.AllContexts) {
+			$key = $ctx.FilePath  # already normalized full path
+
+			if (-not $this.SourceLines.ContainsKey($key)) {
+				# Store the lines only once, ignore duplicates
+				$this.SourceLines[$key] = $ctx.Content `
+					-replace "`r`n", "`n" `
+					-replace "`r", "`n" `
+					-replace ([char]0x2028), "`n" `
+					-replace ([char]0x2029), "`n" `
+					-split("`n")
+			}
+		}
 	}
 
 	[void] LoadFile([string]$filePath) {
@@ -48,38 +66,54 @@ class PASM {
 		$this.FileStack.PushVirtualFile($virtualName, $sourceCode)
 	}
 
-	[void]AddLine([UInt16]$addr, [byte[]]$bytes, [System.Management.Automation.InvocationInfo]$invocation) {
-		$this.assembly.Add([AssemblyLine]::new($addr, $bytes, $invocation.ScriptLineNumber, $invocation.OffsetInLine, 0, $invocation.Line.Trim(), $invocation.ScriptName))
+	[void]AddLine([UInt16]$addr, [byte[]]$bytes, [string]$invocationFile, [int]$invocationLine) {
+
+		# Write-Host "`$invocation.Line: $($invocationLine)"
+		# Write-Host "File: $($invocationFile)"
+		# Write-Host "Line: $($invocationLine)"
+		# Write-Host "Source: $(($map = $this.parser.LineMap[$invocation.Line]) ? $this.SourceLines[$map.File][$map.Line - 1] : "<nullllll>")"
+		# Write-Host "Source: $($this.SourceLines[$invocationFile]?[$invocationLine - 1] ?? "<nullllll>")"
+
+		$this.assembly.Add([AssemblyLine]::new(
+			$addr,
+			$bytes,
+			$invocationLine,
+			0,
+			$this.SourceLines[$invocationFile]?[$invocationLine - 1] ?? "<nullllll>",
+			"<no psSourceLine>",
+			$invocationFile
+		))
 	}
 
-	[void]OpAdd([byte]$OpCode, [System.Management.Automation.InvocationInfo]$invocation) {
-		$this.AddLine($this.pc, @($OpCode), $invocation)
+	[void]OpAdd([byte]$OpCode, [string]$invocationFile, [int]$invocationLine) {
+		$this.AddLine($this.pc, @($OpCode), $invocationFile, $invocationLine)
 		$this.pc++
 	}
 
-	[void]OpAdd([byte]$OpCode, [byte]$Operand, [System.Management.Automation.InvocationInfo]$invocation) {
-		$this.AddLine($this.pc, @($OpCode,$Operand), $invocation)
+	[void]OpAdd([byte]$OpCode, [byte]$Operand, [string]$invocationFile, [int]$invocationLine) {
+		$this.AddLine($this.pc, @($OpCode,$Operand), $invocationFile, $invocationLine)
 		$this.pc+=2
 	}
 
-	[void]OpAdd([byte]$OpCode, [UInt16]$Operand, [System.Management.Automation.InvocationInfo]$invocation) {
-		$this.AddLine($this.pc, @($OpCode,(_loByte $Operand),(_hiByte $Operand)), $invocation)
+	[void]OpAdd([byte]$OpCode, [UInt16]$Operand, [string]$invocationFile, [int]$invocationLine) {
+		$this.AddLine($this.pc, @($OpCode,(_loByte $Operand),(_hiByte $Operand)), $invocationFile, $invocationLine)
 		$this.pc+=3
 	}
 
-	[void]DataAdd([byte[]]$data, [System.Management.Automation.InvocationInfo]$invocation) {
-		$this.AddLine($this.pc, $data, $invocation)
+	[void]DataAdd([byte[]]$data, [string]$invocationFile, [int]$invocationLine) {
+		$this.AddLine($this.pc, $data, $invocationFile, $invocationLine)
 		$this.pc+=$data.Count
 	}
 
-	[void]DataAdd([UInt16[]]$data, [System.Management.Automation.InvocationInfo]$invocation) {
-		$this.AddLine($this.pc, [byte[]]($data | ForEach-Object{_loByte $_;_hiByte $_}), $invocation)
+	[void]DataAdd([UInt16[]]$data, [string]$invocationFile, [int]$invocationLine) {
+		$this.AddLine($this.pc, [byte[]]($data | ForEach-Object{_loByte $_;_hiByte $_}), $invocationFile, $invocationLine)
 		$this.pc+=$data.Count*2
 	}
 
 	[SemanticParser]Parse() {
 		# $this.SourceFiles | ft -auto | out-string | write-host
 		$this.parser = [SemanticParser]::new($this.FileStack)
+		$this.BuildSourceLines()
 		$this.FileStack.Dispose()
 		$this.psSource = $this.parser.outTokens.value -join ''
 		# write-host $this.psSource
@@ -212,18 +246,32 @@ class PASM {
 	[string]ListAssembly() {
 		$sb = [System.Text.StringBuilder]::new(1024)
 		$sbl = [System.Text.StringBuilder]::new(64)
+		$currentDir = $this.FileStack.AllContexts[0].FilePath
+		if (Test-Path $currentDir) { $currentDir = Split-Path $currentDir -Parent } else { $currentDir = (Get-Location).ProviderPath }
+		$currentFile = ""
+		$displayFile = $currentFile
 		for ($lin=0;$lin -lt $this.assembly.count; $lin++) {
+			if ($this.assembly[$lin].fileName -ne $currentFile) {
+				$currentFile = $this.assembly[$lin].fileName
+				$displayFile = if (Test-Path $currentFile) { Resolve-Path $currentFile -Relative -RelativeBasePath $currentDir } else { $currentFile }
+				# $sb.AppendFormat("File: {0}", $displayFile)
+				# $sb.AppendLine()
+			}
 			$a = ("{0:x4}" -f $this.assembly[$lin].addr)
 			$sbl.Clear()
-			for ($i=0; $i -lt $this.assembly[$lin].bytes.Count; $i++) {
-				$sbl.AppendFormat("{0:x2} ", $this.assembly[$lin].bytes[$i])
+			for ($i=1; $i -le $this.assembly[$lin].bytes.Count; $i++) {
+				$sbl.AppendFormat("{0:x2} ", $this.assembly[$lin].bytes[$i-1])
+				if ($i % 16 -eq 0 -and $i+1 -le $this.assembly[$lin].bytes.Count) {
+					$sbl.Append("`n       ")
+				}
 			}
 			$ln = $this.assembly[$lin].lineNumber
 			$col = $this.assembly[$lin].charPosition
 			$c = ("{0}" -f $this.assembly[$lin].psLineText.Trim())
 			$d = ("{0}" -f $this.assembly[$lin].asmLineText.Trim())
 			# $sb.AppendFormat("`${0,-4}: {1,-9}- Ln: {2,-3} Col: {3,-3} - {4,-25} - {5}", $a, $sbl.ToString(), $ln, $col, $d, $c)
-			$sb.AppendFormat("`${0,-4}: {1,-9}- Ln: {2,-3} Col: {3,-3} - {4}", $a, $sbl.ToString(), $ln, $col, $d)
+			# $sb.AppendFormat("`${0,-4}: {1,-9}- Ln: {2,-3} Col: {3,-3} - {4}", $a, $sbl.ToString(), $ln, $col, $d)
+			$sb.AppendFormat("`${0,-4}: {1,-9}- File:{4} Ln: {2,-4} - {3}", $a, $sbl.ToString(), $ln, $d, $displayFile)
 			$sb.AppendLine()
 		}
 		return $sb.ToString()

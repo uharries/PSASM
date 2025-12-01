@@ -5,8 +5,12 @@ class SemanticParser {
 	[ScopeManager]$scopeManager
 	[System.Collections.Generic.List[object]]$Macros
 	[Tokenizer]$tokenizer
+	[int]$LineCounter
+	[hashtable]$LineMap
 
 	SemanticParser([InputFileStack]$FileStack) {
+		$this.LineCounter = 0	### Line Number in outTokens, see ParseToken() for handling
+		$this.LineMap = @{}
 		$this.tokenizer = [Tokenizer]::new($FileStack)
 		$this.inTokens = $this.tokenizer.tokens
 		$this.outTokens = [System.Collections.Generic.List[Token]]::new()
@@ -232,6 +236,8 @@ class SemanticParser {
 		}
 		$nextTokenIndex = $tokenIndex + 1
 		$token = $this.inTokens[$tokenIndex]
+		if ($this.LineCounter -eq 0) { $this.LineMap.Add(++$this.LineCounter, @{File = $token.Filename; Line = ($token.Line)}) }
+
 		switch($token.Type) {
 			([TokenType]::Label) {
 				$j=1
@@ -282,6 +288,10 @@ class SemanticParser {
 					$nextTokenIndex = $this.ParseUntilNextToken($tokenIndex, [TokenType[]]@([TokenType]::SemiColon, [TokenType]::NewLine))
 					$this.AddToken(" -ScopeID $($this.scopeManager.GetCurrentScope());")
 				}
+				if ($token.Value -in '.byte', '.word', '.text', '.txt', '.petscii', '.ascii', '.fill') {
+					$this.AddToken(" -InvocationFile '$($token.Filename)' -InvocationLine $($token.Line)")
+				}
+
 			}
 
 			([TokenType]::Identifier) {
@@ -429,7 +439,7 @@ class SemanticParser {
 				### Skip whitespace after mnemonic
 				$tokenIndex = $this.Skipwhitespace(++$tokenIndex)
 
-				$this.AddToken(".inst $($mne)")
+				$this.AddToken(".inst -Mnemonic $($mne)")
 
 				### Relative
 				if($mne -in 'BCC','BCS','BEQ','BMI','BNE','BPL','BVC','BVS') {
@@ -437,6 +447,7 @@ class SemanticParser {
 					$this.AddToken(" -AddressingMode $($addressingMode) -Operand (")
 					$tokenIndex = $this.ParseTokens($tokenIndex, $instEndIndex-$tokenIndex)
 					$this.AddToken(")")
+					$this.AddToken(" -InvocationFile '$($token.Filename)' -InvocationLine $($token.Line)")
 					$nextTokenIndex = $tokenIndex
 					break
 				}
@@ -445,6 +456,7 @@ class SemanticParser {
 				if($mne -in 'ASL','CLC','CLD','CLI','CLV','DEX','DEY','INX','INY','LSR','NOP','PHA','PHP','PLA','PLP','ROL','ROR','RTI','RTS','SEC','SED','SEI','TAX','TAY','TSX','TXA','TXS','TYA') {
 					$addressingMode = [MOS6502AddressingMode]::Implied
 					$this.AddToken(" -AddressingMode $($addressingMode)")
+					$this.AddToken(" -InvocationFile '$($token.Filename)' -InvocationLine $($token.Line)")
 					$nextTokenIndex = $tokenIndex
 					break
 				}
@@ -514,7 +526,13 @@ class SemanticParser {
 					while($i -lt $operandTokensIndex.Count -and $ti -ge $operandTokensIndex[$i+1]) {$i++}
 				}
 				$this.AddToken(")")
+				$this.AddToken(" -InvocationFile '$($token.Filename)' -InvocationLine $($token.Line)")
 				$nextTokenIndex = $instEndIndex
+			}
+
+			([TokenType]::Newline) {
+				$this.LineMap.Add(++$this.LineCounter, @{File = $token.Filename; Line = ($token.Line+1)})
+				$this.AddToken($token.Value)
 			}
 
 			([TokenType]::EOF) {

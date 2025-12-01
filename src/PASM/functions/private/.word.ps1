@@ -2,7 +2,10 @@ function .word {
 	[Alias('dc.w')]
 	[PASM()] param (
 		[Parameter(Mandatory)]
-		[UInt16[]]$values
+		[UInt16[]]$values,
+
+		[string]$InvocationFile,
+		[int]$InvocationLine
 	)
-	$pasm.DataAdd($values, $MyInvocation)
+	$pasm.DataAdd($values, $InvocationFile, $InvocationLine)
 }

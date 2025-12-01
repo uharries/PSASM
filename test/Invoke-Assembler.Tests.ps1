@@ -263,10 +263,17 @@ Describe 'Include File Handling' {
 
 		It 'Should skip re-inclusion of include-once files' {
 			Set-Content -Path $testFileA -Value @('.includeonce; nop') -Force
-			Set-Content -Path $testFileB -Value '' -Force
 
 			$result = ".include '$testFileA'; .include '$testFileA';" | Invoke-Assembler -NoHostOutput
 			$result.Binary | Should -Be @(0,0,0xea)
+		}
+
+		It 'Should assemble specified source AND all included files' {
+			Set-Content -Path $testFileA -Value @(".byte 1;.include '$testFileB'; .byte 3") -Force
+			Set-Content -Path $testFileB -Value @('.byte 2') -Force
+
+			$result = ".include '$testFileA'; .include '$testFileB'; .byte 4; .byte 5;" | Invoke-Assembler -NoHostOutput
+			$result.Binary | Should -Be @(0,0,1,2,3,2,4,5)
 		}
 	}
 
@@ -274,7 +281,9 @@ Describe 'Include File Handling' {
 		# Cleanup - Pester TestDrive is a bitch, so have to do manual garbage collection...
 		[gc]::Collect()
 		[gc]::Collect()
-		Remove-Item -Path $testFileA, $testFileB -Force
+		[gc]::Collect()
+		$null = Remove-Item -Path $testFileA, $testFileB -Force -ErrorAction SilentlyContinue
+		$null = Remove-Item -Path $testFileA, $testFileB -Force -ErrorAction SilentlyContinue
 	}
 }
 

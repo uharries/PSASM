@@ -1,39 +1,97 @@
 class InputFileContext {
-	[string]$FilePath
-	[System.IO.TextReader]$Reader
-	[int]$Line = 1
-	[int]$Column = 1
-	[System.Collections.Generic.List[string]]$IncludeDirs = [System.Collections.Generic.List[string]]::new()
-	[bool]$IncludeOnce = $false
+    [string]$FilePath
+    [string]$Content
+    [int]   $Index    = 0
+    [int]   $Length   = 0
 
-	InputFileContext([string]$resolvedPath) {
-		$this.FilePath = $resolvedPath
-		$this.Reader   = [System.IO.StreamReader]::new($resolvedPath)
+    [int]   $Line     = 1
+    [int]   $Column   = 1
 
-		# Default include dir is the file’s own directory
-		$this.IncludeDirs.Add([System.IO.Path]::GetDirectoryName($resolvedPath))
+    [System.Collections.Generic.List[string]]$IncludeDirs = [System.Collections.Generic.List[string]]::new()
+    [bool]$IncludeOnce = $false
+
+    InputFileContext([string]$resolvedPath) {
+        $this.FilePath = $resolvedPath
+        $this.Content  = (Get-Content -Path $resolvedPath -Raw)
+		# 					-replace "`r`n", "`n" `
+		# 					-replace "`r", "`n" `
+		# 					-replace ([char]0x2028), "`n" `
+		# 					-replace ([char]0x2029), "`n" `
+		# 					-split("`n")
+        $this.Length   = $this.Content.Length
+        $this.IncludeDirs.Add((Split-Path $resolvedPath -Parent))
+    }
+
+    InputFileContext([string]$filename, [string]$content) {
+        $this.FilePath = $filename
+        $this.Content  = $content
+        $this.Length   = $content.Length
+        $this.IncludeDirs.Add((Get-Location).Path)
+    }
+
+    hidden [bool] IsEOF() {
+        return $this.Index -ge $this.Length
+    }
+
+    [char] PeekChar() {
+        if ($this.IsEOF()) { return 0 }
+        return $this.Content[$this.Index]
+    }
+
+    [char] ReadChar() {
+        if ($this.IsEOF()) { return 0 }
+
+        $ch = $this.Content[$this.Index]
+        $this.Index++
+
+        $code = [int][char]$ch
+
+        # newline family
+        if ($code -in 10,8232,8233) {
+            $this.Line++
+            $this.Column = 1
+            return "`n"
+        }
+
+        # normal char, incl CR
+        $this.Column++
+        return $ch
+    }
+
+	[void] UnReadChar() {
+		if ($this.Index -le 0) { return }
+
+		# Step back one char
+		$this.Index--
+
+		$ch = $this.Content[$this.Index]
+		$code = [int][char]$ch
+
+		if ($this.Column -eq 1) {
+			if ($this.Line -gt 1) {
+				$this.Line--
+				# ---- Recompute column ----
+				$i = $this.Index - 1
+				$col = 1
+				while ($i -ge 0) {
+					$c2 = [int][char]$this.Content[$i]
+					if ($c2 -in 10,8232,8233) { break }
+					$col++
+					$i--
+				}
+				$this.Column = $col
+				return
+			}
+		}
+		$this.Column--
 	}
 
-	InputFileContext([string]$filename, [string]$content) {
-		$this.FilePath = $filename
-		$this.Reader   = [System.IO.StringReader]::new($content)
+    [void] AddIncludeDir([string]$path) {
+        $full = (Resolve-Path $path).Path
+        $this.IncludeDirs.Add($full)
+    }
 
-		# Virtual files can default to current working dir
-		$this.IncludeDirs.Add((Get-Location).Path)
-	}
-
-	[char] ReadChar() {
-		$code = $this.Reader.Read()
-		if ($code -eq -1) { return 0 }
-		if ([char]$code -eq "`n") { $this.Line++; $this.Column = 1 }
-		else { $this.Column++ }
-		return [char]$code
-	}
-
-	[void] Close() { $this.Reader.Dispose() }
-
-	[void] AddIncludeDir([string]$path) {
-		$full = (Resolve-Path $path).Path
-		$this.IncludeDirs.Add($full)
-	}
+    [void] Close() {
+        # nothing to close, file already loaded
+    }
 }

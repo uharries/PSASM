@@ -1,1 +1,1 @@
-nop
+.include 'testA.s'; .include 'testB.s'; .byte 4; .byte 5;
