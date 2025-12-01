@@ -288,7 +288,7 @@ class SemanticParser {
 					$nextTokenIndex = $this.ParseUntilNextToken($tokenIndex, [TokenType[]]@([TokenType]::SemiColon, [TokenType]::NewLine))
 					$this.AddToken(" -ScopeID $($this.scopeManager.GetCurrentScope());")
 				}
-				if ($token.Value -in '.byte', '.word', '.text', '.txt', '.petscii', '.ascii', '.fill') {
+				if ($token.Value -in '.byte', '.word', '.text', '.txt', '.petscii', '.ascii', '.fill', '.align') {
 					$this.AddToken(" -InvocationFile '$($token.Filename)' -InvocationLine $($token.Line)")
 				}
 
