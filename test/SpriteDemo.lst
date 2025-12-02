@@ -49,7 +49,7 @@ $086b: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
        00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
        00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
        00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
-       00 00 00 00 00 - File:.\SpriteDemo.s Ln: 124  - .fill (([math]::Ceiling((.pc) / $boundary) * $boundary) - (.pc)) {$fillByte}
+       00 00 00 00 00 - File:.\SpriteDemo.s Ln: 209  - .align 256
 $0900: a2 00    - File:.\SpriteDemo.s Ln: 212  - ldx	#0
 $0902: ac 12 d0 - File:.\SpriteDemo.s Ln: 213  - ldy	$d012
 $0905: 98       - File:.\SpriteDemo.s Ln: 215  - tya

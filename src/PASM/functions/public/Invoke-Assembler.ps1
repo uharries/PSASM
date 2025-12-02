@@ -65,14 +65,11 @@
 function Invoke-Assembler {
 	[CmdletBinding()]
 	param (
-		[Parameter(ValueFromPipeline)]
-		[object]$InputObject,
-
-		[Parameter()]
+		[Parameter(Position=0)]
 		[Alias("I","Input")]
 		[string]$SourceFile,
 
-		[Parameter()]
+		[Parameter(Position=1)]
 		[Alias("O","Output")]
 		[string]$OutFile,
 
@@ -83,12 +80,15 @@ function Invoke-Assembler {
 		[Alias("ps","psfile")]
 		[string]$DumpPSfile,
 
-		[Alias("l","list")]
-		[switch]$ListAssembly,
-
 		[Parameter()]
 		[Alias("lst")]
 		[string]$ListFile = $SourceFile ? "$($SourceFile -replace '(.*)([.].*)','$1').lst" : $null,
+
+		[Parameter(ValueFromPipeline)]
+		[object]$InputObject,
+
+		[Alias("l","list")]
+		[switch]$ListAssembly,
 
 		[Alias("h","hexdump","DumpHex","dump","hex")]
 		[switch]$ListBinary,
