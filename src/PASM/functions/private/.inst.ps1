@@ -53,7 +53,7 @@ function .inst {
 	}
 
 	if ($AddressingMode -match 'Relative') {
-		$Operand = [byte](($Operand - $pasm.pc - 2) -band 255)
+		$Operand = [byte](($Operand - $pasm.Segments.Current.PC - 2) -band 255)
 	}
 
 	if ([MOS6502]::OperandSize.$AddressingMode -eq 16) {

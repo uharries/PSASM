@@ -26,6 +26,7 @@ Get-ChildItem -Path "$PSScriptRoot\Enums\*.ps1" -ErrorAction Ignore | ForEach-Ob
 . "$PSScriptRoot\Classes\AssemblyLine.ps1"
 . "$PSScriptRoot\Classes\MOS6502.ps1"
 . "$PSScriptRoot\Classes\AssemblerInformation.ps1"
+. "$PSScriptRoot\Classes\SegmentManager.ps1"
 . "$PSScriptRoot\Classes\PASM.ps1"
 
 

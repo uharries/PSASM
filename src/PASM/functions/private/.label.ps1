@@ -7,7 +7,7 @@ function .label {
 		[string]$name,
 		[int]$scopeId,
 
-		[object]$addr = [UInt16]$pasm.pc
+		[object]$addr = [UInt16]$pasm.Segments.Current.PC
 	)
 
 	# Write-Host ".label(name='$name', scopeId=$scopeId, addr=$addr)" -ForegroundColor Magenta

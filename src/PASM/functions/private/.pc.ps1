@@ -4,8 +4,8 @@ function .pc {
 	)
 
 	if ($addr) {
-		$pasm.pc = $addr
+		$pasm.Segments.Current.PC = $addr
 	} else {
-		return $pasm.pc
+		return $pasm.Segments.Current.PC
 	}
 }

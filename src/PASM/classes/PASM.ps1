@@ -29,17 +29,19 @@ class PASM {
 	[hashtable]$Macros = [ordered] @{0 = [ordered] @{ BRA = {param($addr)jmp $addr}}} # [ScopeID][Name] = [ScriptBlock]
 	[InputFileStack]$FileStack
 	[HashTable]$SourceLines
+	[SegmentManager]$Segments
 
 	PASM() {
 		$this.Init()
 	}
 
 	hidden [void]Init() {
-		$this.pc = 0
+		# $this.pc = 0
 		$this.loadAddress = 0x0000
 		$this.assembly = [System.Collections.ArrayList]@()
 		$this.FileStack = [InputFileStack]::new()
 		$this.SourceLines = @{}
+		$this.Segments = [SegmentManager]::new()
 	}
 
 	[void] BuildSourceLines() {
@@ -66,7 +68,7 @@ class PASM {
 		$this.FileStack.PushVirtualFile($virtualName, $sourceCode)
 	}
 
-	[void]AddLine([UInt16]$addr, [byte[]]$bytes, [string]$invocationFile, [int]$invocationLine) {
+	[void]AddLine([byte[]]$bytes, [string]$invocationFile, [int]$invocationLine) {
 
 		# Write-Host "`$invocation.Line: $($invocationLine)"
 		# Write-Host "File: $($invocationFile)"
@@ -75,39 +77,36 @@ class PASM {
 		# Write-Host "Source: $($this.SourceLines[$invocationFile]?[$invocationLine - 1] ?? "<nullllll>")"
 
 		$this.assembly.Add([AssemblyLine]::new(
-			$addr,
+			$this.Segments.Current.Name,
+			$this.Segments.Current.PC,
 			$bytes,
 			$invocationLine,
 			0,
-			$this.SourceLines[$invocationFile]?[$invocationLine - 1] ?? "<nullllll>",
+			$this.SourceLines[$invocationFile]?[$invocationLine - 1] ?? "<null>",
 			"<no psSourceLine>",
 			$invocationFile
 		))
+		$this.Segments.Emit($bytes)
 	}
 
 	[void]OpAdd([byte]$OpCode, [string]$invocationFile, [int]$invocationLine) {
-		$this.AddLine($this.pc, @($OpCode), $invocationFile, $invocationLine)
-		$this.pc++
+		$this.AddLine(@($OpCode), $invocationFile, $invocationLine)
 	}
 
 	[void]OpAdd([byte]$OpCode, [byte]$Operand, [string]$invocationFile, [int]$invocationLine) {
-		$this.AddLine($this.pc, @($OpCode,$Operand), $invocationFile, $invocationLine)
-		$this.pc+=2
+		$this.AddLine(@($OpCode,$Operand), $invocationFile, $invocationLine)
 	}
 
 	[void]OpAdd([byte]$OpCode, [UInt16]$Operand, [string]$invocationFile, [int]$invocationLine) {
-		$this.AddLine($this.pc, @($OpCode,(_loByte $Operand),(_hiByte $Operand)), $invocationFile, $invocationLine)
-		$this.pc+=3
+		$this.AddLine(@($OpCode,(_loByte $Operand),(_hiByte $Operand)), $invocationFile, $invocationLine)
 	}
 
 	[void]DataAdd([byte[]]$data, [string]$invocationFile, [int]$invocationLine) {
-		$this.AddLine($this.pc, $data, $invocationFile, $invocationLine)
-		$this.pc+=$data.Count
+		$this.AddLine($data, $invocationFile, $invocationLine)
 	}
 
 	[void]DataAdd([UInt16[]]$data, [string]$invocationFile, [int]$invocationLine) {
-		$this.AddLine($this.pc, [byte[]]($data | ForEach-Object{_loByte $_;_hiByte $_}), $invocationFile, $invocationLine)
-		$this.pc+=$data.Count*2
+		$this.AddLine([byte[]]($data | ForEach-Object{_loByte $_;_hiByte $_}), $invocationFile, $invocationLine)
 	}
 
 	[SemanticParser]Parse() {
@@ -138,7 +137,7 @@ class PASM {
 				Write-Host "Pass $($i)..." -NoNewline
 			}
 			$this.assembly.Clear()
-			$this.pc = 0
+			$this.Segments.Reset()
 			$error.Clear()
 			$psError=$null
 
@@ -184,20 +183,24 @@ class PASM {
 			}
 			# not quite sure what to do with errors and the $error object here yet...
 
-			$this.assembly = @($this.assembly | Sort-Object addr)
-			$this.loadAddress = $this.assembly[0].addr
+			# $this.assembly = @($this.assembly | Sort-Object addr)
+
+			### Build binary - BuildBinary() must be run to populate Segments.LowestAddress
+			$binaryData = $this.Segments.BuildBinary()
+			$this.loadAddress = $this.Segments.LowestAddress
 			$bin.Clear()
 			$bin.Add(([byte]($this.loadAddress -band 255)))
 			$bin.Add(([byte](($this.loadAddress -shr 8) -band 255)))
-			$addrCnt = $this.loadAddress
-			foreach ($l in $this.assembly) {
-				if($l.addr - $addrCnt -gt 0) {
-					# Fill out empty space in binary - 0x00 should be a configurable fillbyte var...
-					$bin.AddRange([byte[]]@(0x00) * ($l.addr - $addrCnt))
-				}
-				$bin.AddRange($l.bytes)
-				$addrCnt = $l.addr + $l.bytes.count
-			}
+			$bin.AddRange($binaryData)
+			# $addrCnt = $this.loadAddress
+			# foreach ($l in $this.assembly) {
+			# 	if($l.addr - $addrCnt -gt 0) {
+			# 		# Fill out empty space in binary - 0x00 should be a configurable fillbyte var...
+			# 		$bin.AddRange([byte[]]@(0x00) * ($l.addr - $addrCnt))
+			# 	}
+			# 	$bin.AddRange($l.bytes)
+			# 	$addrCnt = $l.addr + $l.bytes.count
+			# }
 
 			$oldHash = $this.binaryHash
 			$this.binaryHash = [System.BitConverter]::ToString([System.Security.Cryptography.SHA256CryptoServiceProvider]::new().ComputeHash($bin)) -replace '-',''
