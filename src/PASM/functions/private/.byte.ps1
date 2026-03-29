@@ -2,10 +2,20 @@ function .byte {
 	[Alias('dc.b')]
 	[PASM()] param (
 		[Parameter(Mandatory)]
-		[byte[]]$values,
+		[int[]]$values,
 
 		[string]$InvocationFile,
 		[int]$InvocationLine
 	)
-	$pasm.DataAdd($values, $InvocationFile, $InvocationLine)
+
+	$normalized = foreach ($v in $values) {
+		if ($v -ge -128 -and $v -lt 0) {
+			$v += 256
+		}
+		if ($v -lt 0 -or $v -gt 0xff) {
+			throw "File: $InvocationFile, Line: $InvocationLine - Value $v is out of range for a byte."
+		}
+		[byte]($v -band 0xff)
+	}
+	$pasm.DataAdd($normalized, $InvocationFile, $InvocationLine)
 }

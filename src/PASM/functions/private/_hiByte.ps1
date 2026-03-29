@@ -2,7 +2,9 @@ function _hiByte {
 	[Alias('.hi')]
 	[PASM()] param (
 		[Parameter(Mandatory)]
-		[UInt16]$value
+		[int]$value
 	)
-	return [byte](($value -band 0xff00) / 256)
+
+	$v = $value -band 0xffff
+	return [byte]($v -shr 8)
 }

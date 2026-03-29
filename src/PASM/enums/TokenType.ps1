@@ -51,4 +51,5 @@ enum TokenType {
 	EOF
 	Error
 	IncludeDirective
+	AtSymbol
 }

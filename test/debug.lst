@@ -1,11 +1,1 @@
-$0002: f1 f2 f3 - File:.\debug.s Ln: 9    - Lab1:	.byte	$f1,$f2,$f3
-$1000: ea       - File:.\debug.s Ln: 12   - nop
-$1001: a5 02    - File:.\debug.s Ln: 13   - lda	zp.Lab1
-$1100: ab cd ef - File:.\debug.s Ln: 17   - .byte	$ab,$cd,$ef
-$1003: a9 ae    - File:.\debug.s Ln: 21   - lda	#$ae
-$1005: 8d 00 04 - File:.\debug.s Ln: 22   - sta	SCREEN
-$8000: a9 80    - File:.\debug.s Ln: 26   - lda	#>:-
-$8002: 8d 07 80 - File:.\debug.s Ln: 27   - sta :+
-$8005: d0 f9    - File:.\debug.s Ln: 28   - bne :-
-$8007: 12 34 56 - File:.\debug.s Ln: 30   - .byte	$12,$34,$56
 

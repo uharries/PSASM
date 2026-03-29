@@ -7,6 +7,7 @@ class SemanticParser {
 	[Tokenizer]$tokenizer
 	[int]$LineCounter
 	[hashtable]$LineMap
+	[MultiLevelCounter]$hashTableCounter
 
 	SemanticParser([InputFileStack]$FileStack) {
 		$this.LineCounter = 0	### Line Number in outTokens, see ParseToken() for handling
@@ -17,6 +18,7 @@ class SemanticParser {
 		$this.symbolManager = [SymbolManager]::new()
 		$this.scopeManager = [ScopeManager]::new()
 		$this.Macros = [System.Collections.Generic.List[PSCustomObject]]::new()
+		$this.hashTableCounter = [MultiLevelCounter]::new(2)
 		$this.MapLabels()	### This must be done before mapping scopes and symbols!
 		$this.MapScopes()	### This must be done before mapping symbols!
 		$this.MapSymbols()  ### This must be done before parsing tokens!
@@ -177,7 +179,7 @@ class SemanticParser {
 			$token = $this.inTokens[$tokenIndex]
 			switch($token.Type) {
 				([TokenType]::LCurly) {
-					$matchedIndex = $this.LookBackForToken($tokenIndex, @([TokenType]::LCurly, [TokenType]::RCurly, [TokenType]::Pipe), @([TokenType]::Label, [TokenType]::AnonymousLabel, [TokenType]::Identifier), $true)
+					$matchedIndex = $this.LookBackForToken($tokenIndex, @([TokenType]::LCurly, [TokenType]::RCurly, [TokenType]::Pipe), @([TokenType]::Label, [TokenType]::AnonymousLabel, [TokenType]::Identifier, [TokenType]::PSClassMethod), $true)
 					if ($matchedIndex -ge 0) {
 						$this.scopeManager.EnterNewScope($this.inTokens[$matchedIndex].Value, $tokenIndex, $token.Line, $token.Column)
 					} else {
@@ -302,45 +304,61 @@ class SemanticParser {
 					$ti++
 					$tval += $this.inTokens[$ti].Value
 				}
-				# Check if next token is '=' (assignment) - if so, convert to .label call
-				if ($this.IsNextToken($ti, [TokenType]::Equals)) {
-					$this.symbolManager.AddUnresolvedSymbol($tval, $this.scopeManager.GetCurrentScope(), $token.Line, $token.Column)
-					$this.AddToken(".label -name $tval -scopeId $($this.scopeManager.GetCurrentScope()) -addr (")
-					# Skip the Equal sign
-					$ti = $this.SkipToNextToken($ti, [TokenType]::Equals)
-					# Parse nested expression until semicolon or newline
-					$nextTokenIndex = $this.ParseUntilNextToken($ti, [TokenType[]]@([TokenType]::SemiColon, [TokenType]::NewLine))
-					$this.AddToken(");")
+
+				if ($this.hashTableCounter.Counters[0] -gt 0 -and $this.hashTableCounter.Counters[1] -eq 1) {
+					# We're in a hashtable so identifier is a key, return as is and let PowerShell handle it
+					$this.AddToken($token.Value)
 					break
 				}
-				if($this.symbolManager.TestSymbol($tval, $this.scopeManager.GetCurrentScope())) {
-					# Get the macro name without any scope qualification, but keep the leading . if $tval is not qualified.
-					$mname = $tval -replace '^(?!\.[^.]+$).*\.', ''
-					if ($mname -in $this.Macros.Name -and -not ($this.IsPrevTokenValue($ti, '\.mac(ro)?'))) {
-						$this.AddToken("_invokeMacro -name '$tval' -ScopeID $($this.scopeManager.GetCurrentScope()) -MacroArgs @(")
+
+				if (-not $this.IsPrevToken($tokenIndex, [TokenType]::ColonColon)) {
+					# Check if next token is '=' (assignment) - if so, convert to .label call
+					if ($this.IsNextToken($ti, [TokenType]::Equals)) {
+						$this.symbolManager.AddUnresolvedSymbol($tval, $this.scopeManager.GetCurrentScope(), $token.Line, $token.Column)
+						$this.AddToken(".label -name $tval -scopeId $($this.scopeManager.GetCurrentScope()) -addr (")
+						# Skip the Equal sign
+						$ti = $this.SkipToNextToken($ti, [TokenType]::Equals)
 						# Parse nested expression until semicolon or newline
-						$nextTokenIndex = $this.ParseUntilNextToken($ti, [TokenType[]]@([TokenType]::SemiColon, [TokenType]::NewLine, [TokenType]::RCurly))
-						$this.AddToken(")")
+						$nextTokenIndex = $this.ParseUntilNextToken($ti, [TokenType[]]@([TokenType]::SemiColon, [TokenType]::NewLine))
+						$this.AddToken(");")
 						break
 					}
-					if (-not ($mname -in $this.Macros.Name)) {
-						$this.AddToken('(_getSymbol "'+$($tval)+'" '+$($this.scopeManager.GetCurrentScope())+' '+$($token.Line)+' '+$($token.Column)+')')
-						$nextTokenIndex = $ti+1
-						break
+					if($this.symbolManager.TestSymbol($tval, $this.scopeManager.GetCurrentScope())) {
+						# Get the macro name without any scope qualification, but keep the leading . if $tval is not qualified.
+						$mname = $tval -replace '^(?!\.[^.]+$).*\.', ''
+						if ($mname -in $this.Macros.Name -and -not ($this.IsPrevTokenValue($ti, '\.mac(ro)?'))) {
+							$this.AddToken("_invokeMacro -name '$tval' -ScopeID $($this.scopeManager.GetCurrentScope()) -MacroArgs @(")
+							# Parse nested expression until semicolon or newline
+							$nextTokenIndex = $this.ParseUntilNextToken($ti, [TokenType[]]@([TokenType]::SemiColon, [TokenType]::NewLine, [TokenType]::RCurly))
+							$this.AddToken(")")
+							break
+						}
+						if (-not ($mname -in $this.Macros.Name)) {
+							# This is shit... If a minus is immediately preceding the identifier, I assume it's a parameter to a function
+							# The correct solution is to keep track of if we are in a function call or not...
+							# Maybe even do this in the Tokenizer, since there is a token type PSFunctionParameter, where i btw also make assumtions I should not.
+							# For now I guess if you need to subtract a label/identifier from something, you just need to put a space between the minus and the identifier.
+							if ($this.inTokens[$ti-1].Type -ne [TokenType]::Minus) {
+								$this.AddToken('(_getSymbol "'+$($tval)+'" '+$($this.scopeManager.GetCurrentScope())+' '+$($token.Line)+' '+$($token.Column)+')')
+								$nextTokenIndex = $ti+1
+								break
+							}
+						}
 					}
 				}
+
 				$this.AddToken($token.Value)
 			}
 
 			([TokenType]::CStyleBlockComment) {
-				$s = $token.Value
-				$s = $s -replace '/\*','<#'
-				$s = $s -replace '\*/','#>'
-				$this.AddToken($s)
+				# $s = $token.Value
+				# $s = $s -replace '/\*','<#'
+				# $s = $s -replace '\*/','#>'
+				# $this.AddToken($s)
 			}
 
 			([TokenType]::CStyleLineComment) {
-				$this.AddToken(($token.Value -replace '//',' #'))
+				# $this.AddToken(($token.Value -replace '//',' #'))
 			}
 
 			([TokenType]::NumericLiteral) {
@@ -373,6 +391,9 @@ class SemanticParser {
 			}
 
 			([TokenType]::LCurly) {
+				if ($this.hashTableCounter.Counters[0] -gt 0) {
+					$this.hashTableCounter.Inc(1)
+				}
 				$this.scopeManager.EnterScope($tokenIndex)
 				$this.AddToken($token.Value)
 				$ti = $tokenIndex+1
@@ -382,6 +403,12 @@ class SemanticParser {
 			}
 
 			([TokenType]::RCurly) {
+				if ($this.hashTableCounter.Counters[0] -gt 0) {
+					$this.hashTableCounter.Dec(1)
+					if ($this.hashTableCounter.Counters[1] -eq 0) {
+						$this.hashTableCounter.Dec(0)
+					}
+				}
 				$this.scopeManager.ExitScope()
 				$this.AddToken($token.Value)
 			}
@@ -413,6 +440,13 @@ class SemanticParser {
 				if ($this.IsNextToken($tokenIndex, [TokenType[]]@([TokenType]::Equals, [TokenType]::Comma, [TokenType]::Divide, [TokenType]::Minus, [TokenType]::Modulo, [TokenType]::Plus, [TokenType]::Asterisk, [TokenType]::RParen))) {
 					$this.AddToken("(.pc)")
 					break;
+				}
+				$this.AddToken($token.Value)
+			}
+
+			([TokenType]::AtSymbol) {
+				if ($this.IsNextToken($tokenIndex, [TokenType]::LCurly)) {
+					$this.hashTableCounter.Inc(0)
 				}
 				$this.AddToken($token.Value)
 			}
@@ -453,13 +487,13 @@ class SemanticParser {
 				}
 
 				### Implied
-				if($mne -in 'ASL','CLC','CLD','CLI','CLV','DEX','DEY','INX','INY','LSR','NOP','PHA','PHP','PLA','PLP','ROL','ROR','RTI','RTS','SEC','SED','SEI','TAX','TAY','TSX','TXA','TXS','TYA') {
-					$addressingMode = [MOS6502AddressingMode]::Implied
-					$this.AddToken(" -AddressingMode $($addressingMode)")
-					$this.AddToken(" -InvocationFile '$($token.Filename)' -InvocationLine $($token.Line)")
-					$nextTokenIndex = $tokenIndex
-					break
-				}
+				# if($mne -in 'ASL','CLC','CLD','CLI','CLV','DEX','DEY','INX','INY','LSR','NOP','PHA','PHP','PLA','PLP','ROL','ROR','RTI','RTS','SEC','SED','SEI','TAX','TAY','TSX','TXA','TXS','TYA') {
+				# 	$addressingMode = [MOS6502AddressingMode]::Implied
+				# 	$this.AddToken(" -AddressingMode $($addressingMode)")
+				# 	$this.AddToken(" -InvocationFile '$($token.Filename)' -InvocationLine $($token.Line)")
+				# 	$nextTokenIndex = $tokenIndex
+				# 	break
+				# }
 
 				### Rest of the addressing modes
 				enum State {Init; Immediate; Absolute; AbsoluteIndexed; AbsoluteIndexedX; AbsoluteIndexedY; Indirect; IndirectAbsolute; IndirectIndexed; IndirectIndexedY; Indexed; IndexedX; IndexedXIndirect}
@@ -518,14 +552,19 @@ class SemanticParser {
 					}
 				}
 
-				$addressingMode = [MOS6502AddressingMode]$state.ToString()
-				$this.AddToken(" -AddressingMode $($addressingMode) -Operand (")
+				if($state -eq [state]::Init) {
+					$addressingMode = [MOS6502AddressingMode]::Implied
+					$this.AddToken(" -AddressingMode $($addressingMode)")
+				} else {
+					$addressingMode = [MOS6502AddressingMode]$state.ToString()
+					$this.AddToken(" -AddressingMode $($addressingMode) -Operand (")
 
-				for($i=0;$i -lt $operandTokensIndex.Count;$i++) {
-					$ti = $this.ParseToken($operandTokensIndex[$i]) - 1
-					while($i -lt $operandTokensIndex.Count -and $ti -ge $operandTokensIndex[$i+1]) {$i++}
+					for($i=0;$i -lt $operandTokensIndex.Count;$i++) {
+						$ti = $this.ParseToken($operandTokensIndex[$i]) - 1
+						while($i -lt $operandTokensIndex.Count -and $ti -ge $operandTokensIndex[$i+1]) {$i++}
+					}
+					$this.AddToken(")")
 				}
-				$this.AddToken(")")
 				$this.AddToken(" -InvocationFile '$($token.Filename)' -InvocationLine $($token.Line)")
 				$nextTokenIndex = $instEndIndex
 			}

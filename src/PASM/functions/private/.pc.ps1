@@ -4,8 +4,8 @@ function .pc {
 	)
 
 	if ($addr) {
-		$pasm.Segments.Current.PC = $addr
+		$pasm.Segments.Current.SetPC($addr)
 	} else {
-		return $pasm.Segments.Current.PC
+		return $pasm.Segments.Current.GetPC()
 	}
 }

@@ -3,5 +3,5 @@ function .org {
 		[Parameter(Mandatory)]
 		[UInt16]$addr
 	)
-	$pasm.Segments.Current.PC = $addr
+	$pasm.Segments.Current.SetPC($addr)
 }

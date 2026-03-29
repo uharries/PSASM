@@ -2,7 +2,8 @@ function _loByte {
 	[Alias('.lo')]
 	[PASM()] param (
 		[Parameter(Mandatory)]
-		[UInt16]$value
+		[int]$value
 	)
-	return [byte]($value -band 0x00ff)
+
+	return [byte]($value -band 0xff)
 }

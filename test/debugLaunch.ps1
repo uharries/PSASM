@@ -10,7 +10,7 @@
 # $res = Invoke-Assembler -SourceFile "Tmp:\testC.s" -ListAssembly -ListBinary
 # $res = '.include ".\test\asm1.s"' | Invoke-Assembler -ListAssembly -ListBinary
 # $res = '.byte $de,$ad' | Invoke-Assembler -ListAssembly -ListBinary
-$res = Invoke-Assembler -SourceFile ".\test\debug.s" -NoHostOutput
+$res = Invoke-Assembler -SourceFile ".\test\debug.s" #-NoHostOutput
 
 # Write-Host "AssemblyList:" -ForegroundColor Yellow
 # Write-Host "$($res.AssemblyList)"

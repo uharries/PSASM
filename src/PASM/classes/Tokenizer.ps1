@@ -354,31 +354,27 @@ class Tokenizer {
 			'/' {return $this.NewToken([TokenType]::Divide)}
 			'*' {return $this.NewToken([TokenType]::Asterisk)}
 			'%' {
-				$i=-1
-				while($this.tokens[$i].Type -notin $null, [TokenType]::SemiColon, [TokenType]::NewLine) {
-					if($this.tokens[$i--].Type -in [TokenType]::Mnemonic, [TokenType]::Directive) {
-						$k=-1
-						while($this.tokens[$k].Type -notin [TokenType]::Mnemonic, [TokenType]::Directive) {
-							if($this.tokens[$k].Type -in [TokenType]::Whitespace) {
-								$k--
-								continue
-							}
-							if($this.tokens[$k--].Type -in [TokenType]::Hash, [TokenType]::Comma, [TokenType]::Divide, [TokenType]::Equals, [TokenType]::LAngle, [TokenType]::RAngle, [TokenType]::LParen, [TokenType]::Minus, [TokenType]::Modulo, [TokenType]::Plus, [TokenType]::Asterisk) {
-								$cnt=0
-								while($this.GetChar() -in $script:CharsBin) {$cnt++}
-								$this.UnGetChar()
-								if($cnt -gt 0 -and $this.PeekChar() -match '^\W') {
-									return $this.NewToken([TokenType]::NumericLiteral)
-								} else {
-									# return $this.ScanVariable()
-								}
-							}
-							return $this.NewToken([TokenType]::Modulo)
+					$i = -1
+					while ($this.tokens[$i].Type -in [TokenType]::WhiteSpace, [TokenType]::CStyleBlockComment, [TokenType]::PSBlockComment) {
+						$i--
+					}
+					$prev = $this.tokens[$i] # Previous non-whitespace, non-block-comment token
+
+					if($prev.Type -in $null, [TokenType]::NewLine, [TokenType]::SemiColon, [TokenType]::LCurly, [TokenType]::LParen, [TokenType]::LAngle, [TokenType]::RAngle, [TokenType]::LBracket, [TokenType]::Directive, [TokenType]::Mnemonic, [TokenType]::Hash, [TokenType]::Comma, [TokenType]::Divide, [TokenType]::Equals, [TokenType]::Minus, [TokenType]::Modulo, [TokenType]::Plus, [TokenType]::Asterisk, [TokenType]::TernaryColon, [TokenType]::QuestionMark) {
+						# Unary % operator, treat as start of binary number
+						$cnt=0
+						while($this.GetChar() -in $script:CharsBin) {$cnt++}
+						$this.UnGetChar()
+						if($cnt -gt 0 -and $this.PeekChar() -match '^\W') {
+							return $this.NewToken([TokenType]::NumericLiteral)
+						} else {
+							throw "Unexpected character '$($this.PeekChar())' after binary literal at line $($this.tline), column $($this.tcolumn)"
 						}
+					} else {
+						# Else assume binary modulo operator or Foreach-Object alias, both represented by the same token type and disambiguated in the ps parser
+						return $this.NewToken([TokenType]::Modulo)
 					}
 				}
-				return $this.NewToken([TokenType]::Modulo)
-			}
 			'=' {return $this.NewToken([TokenType]::Equals)}
 			',' {return $this.NewToken([TokenType]::Comma)}
 			'|' {return $this.NewToken([TokenType]::Pipe)}
@@ -468,6 +464,9 @@ class Tokenizer {
 				}
 				$this.sawQuestionMark = $true
 				return $this.NewToken([TokenType]::QuestionMark)
+			}
+			'@' {
+				return $this.NewToken([TokenType]::AtSymbol)
 			}
 
 			{$_ -in [char[]]($script:Char_ + $script:CharsAtoZ)} {

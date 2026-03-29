@@ -198,7 +198,30 @@ function Invoke-Assembler {
 			}
 			$asmInfo.Binary | set-content -asbytestream -path $OutFile -Force
 			if (-not $NoHostOutput) {
-				Write-Host ("File Hash: {0:x}" -f ((Get-FileHash -Algorithm SHA256 $OutFile).Hash))
+				for ($i = 0; $i -lt $maxRetries; $i++) {
+					try {
+						$hash = (Get-FileHash -Algorithm SHA256 -Path $OutFile -ErrorAction Stop).Hash
+						break
+					}
+					catch {
+						Start-Sleep -Milliseconds $delayMs
+					}
+				}
+
+				for ($i = 0; $i -lt 30; $i++) {
+					try {
+						$hash = (Get-FileHash -Algorithm SHA256 -Path $OutFile -ErrorAction Stop).Hash
+						break
+					} catch {
+						Start-Sleep -Milliseconds 100
+					}
+				}
+
+				if (-not $hash) {
+					throw "Failed to compute file hash for: $OutFile"
+				}
+
+				Write-Host ("File Hash: {0:x}" -f $hash)
 			}
 			if ($LabelFile) {
 				if (-not(Test-Path -Path $LabelFile)) {

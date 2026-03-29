@@ -3,6 +3,7 @@ class AssemblerInformation {
 	[UInt16]$LoadAddress
 	[Scope[]]$Scopes
 	[object[]]$Symbols
+	[object[]]$Segments
 	[string]$PSSource
 	[array]$SourceMap
 	[array]$Assembly
@@ -16,6 +17,7 @@ class AssemblerInformation {
 		$this.LoadAddress = $params.LoadAddress
 		$this.Scopes = $params.Scopes
 		$this.Symbols = $params.Symbols
+		$this.Segments = $params.Segments
 		$this.PSSource = $params.PSSource
 		$this.Assembly = $params.Assembly
 		$this.AssemblyList = $params.AssemblyList

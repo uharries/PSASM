@@ -137,6 +137,7 @@ class PASM {
 				Write-Host "Pass $($i)..." -NoNewline
 			}
 			$this.assembly.Clear()
+			# $this.Segments.ResolveStartAfter()
 			$this.Segments.Reset()
 			$error.Clear()
 			$psError=$null
@@ -144,14 +145,16 @@ class PASM {
 			try {
 				$sb = [ScriptBlock]::Create(($this.psSource | out-string))
 			} catch {
+				$_.Exception.Data["TOKENS"] = $this.parser.inTokens
 				if(-not $this.NoHostOutput) {
 					Write-Host " FAILED!"
 					Write-Host "Error in parsing generated PowerShell source code!"
 					Write-Host $this.psSource
 					Write-Host "Scopes: $($this.symbolManager.Scopes | ft -auto | out-string)"
 					Write-Host "SymbolTable: $($this.symbolManager.GetFullSymbolTable() | ft -auto | out-string)"
+					Write-Host "Look at `$Error[0].Exception.Data['TOKENS'] for the tokens"
 				}
-				throw $_
+				throw
 				# throw [System.Exception]::new(("Error in psSource line {0}, column {1}: {2}: {3} '{4}'" -f
 				# 	$_.Exception.InnerException.ErrorRecord.InvocationInfo.ScriptLineNumber,
 				# 	$_.Exception.InnerException.ErrorRecord.InvocationInfo.OffsetInLine,
@@ -184,6 +187,10 @@ class PASM {
 			# not quite sure what to do with errors and the $error object here yet...
 
 			# $this.assembly = @($this.assembly | Sort-Object addr)
+			### Solve segment layout
+			$this.Segments.SolveLayout()
+
+			# $this.Segments.Segments.Values | sort realStart | ft * -auto | out-string | write-host
 
 			### Build binary - BuildBinary() must be run to populate Segments.LowestAddress
 			$binaryData = $this.Segments.BuildBinary()
@@ -215,6 +222,7 @@ class PASM {
 					# Write-Warning -Message "Unresolved symbols defined: $s"
 					# break
 				# }
+				# $this.Segments.ValidateSegments() # Throws if overlaps or overflows detected
 				$this.binary = $bin.ToArray()
 				$success = $true
 			}
@@ -232,6 +240,7 @@ class PASM {
 			Scopes = $this.scopes
 			# Symbols = $this.symbolManager.GetFullSymbolTable()
 			Symbols = $this.symbolManager.GetSymbolTable()
+			Segments = $this.Segments.Segments
 			PSSource = $this.psSource | Out-String
 			Assembly = $this.assembly
 			AssemblyList = $this.ListAssembly()

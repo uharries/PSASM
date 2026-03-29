@@ -288,5 +288,176 @@ Describe 'Include File Handling' {
 	}
 }
 
+
+Describe 'Segment Handling' {
+	Context 'Segments' {
+
+		#
+		# Explicit Start
+		#
+		It 'Places code at explicit addresses <code>' -TestCases @(
+			@{
+				code   = '.segment code -Start $1000; lda #1'
+				binary = @(0x00,0x10, 0xa9,1)
+			}
+			@{
+				code   = '.segment data -Start $1200; .fill 3 { $_ }'
+				binary = @(0x00,0x12, 0,1,2)
+			}
+		) {
+			($code | Invoke-Assembler -NoHostOutput).Binary | Should -Be $binary
+		}
+
+		#
+		# Virtual segments (occupy space, emit nothing)
+		#
+		It 'Supports virtual segments and places following code correctly' -TestCases @(
+			@{
+				code = @'
+	.segment v -Virtual
+		.fill 5 { 0 }
+	.segment code -StartAfter v
+		lda #7
+'@
+				binary = @(0x05,0x00, 0xa9,7)   # virtual = 5 bytes offset
+			}
+		) {
+			($code | Invoke-Assembler -NoHostOutput).Binary | Should -Be $binary
+		}
+
+		#
+		# StartAfter
+		#
+		It 'Resolves segments using StartAfter' -TestCases @(
+			@{
+				code = @'
+	.segment first -Start $0800
+		lda #1
+	.segment second -StartAfter first
+		lda #2
+'@
+				binary = @(0x00,0x08, 0xa9,1, 0xa9,2)
+			}
+		) {
+			($code | Invoke-Assembler -NoHostOutput).Binary | Should -Be $binary
+		}
+
+		#
+		# pushsegment / popsegment
+		#
+		It 'Supports pushsegment / popsegment' -TestCases @(
+			@{
+				code = @'
+	.segment code -Start 2
+		lda #1
+	.pushsegment data -StartAfter code
+		.fill 2 { $_ }
+	.popsegment
+		lda #3
+'@
+				binary = @(0x02,0x00, 0xa9,1, 0xa9,3 ,0,1)
+			}
+		) {
+			($code | Invoke-Assembler -NoHostOutput).Binary | Should -Be $binary
+		}
+
+		#
+		# Size limit (should throw)
+		#
+		It 'Throws when segment exceeds -Size' -TestCases @(
+			@{
+				code     = '.segment small -Size 1; lda #1; lda #2'
+				expected = "Segment 'small' exceeds defined Size of 0x0001 with actual size 0x0004"
+			}
+		) {
+			{ $code | Invoke-Assembler -NoHostOutput } |
+				Should -Throw $expected
+		}
+
+		#
+		# End limit (should throw)
+		#
+		It 'Throws when segment exceeds -End' -TestCases @(
+			@{
+				code = '.segment s -Start $1000 -End $1001; lda #1; lda #2'
+				expected = "Segment 's' exceeds defined End at 0x1001 with actual end address 0x1003"
+			}
+		) {
+			{ $code | Invoke-Assembler -NoHostOutput } |
+				Should -Throw $expected
+		}
+
+		#
+		# Overlap detection
+		#
+		It 'Throws on overlapping segments' -TestCases @(
+			@{
+				code = @'
+	.segment a -Start $2000
+		lda #1
+	.segment b -Start $2001
+		lda #2
+'@
+				expected = "Segment 'b' overlaps 'a' at address 0x2001"
+			}
+		) {
+			{ $code | Invoke-Assembler -NoHostOutput } |
+				Should -Throw $expected
+		}
+
+		#
+		# Ordering: mixed virtual + real
+		#
+		It 'Emits final binary in correct segment order' -TestCases @(
+			@{
+				code = @'
+	.segment v1 -Virtual
+		.fill 3 {0}
+
+	.segment code1 -StartAfter v1
+		lda #9
+
+	.segment v2 -StartAfter code1 -Virtual
+		.fill 2 {0}
+
+	.segment code2 -StartAfter v2
+		lda #4
+'@
+				binary = @(3,0,0xA9,9, 0,0, 0xA9,4)
+			}
+		) {
+			($code | Invoke-Assembler -NoHostOutput).Binary | Should -Be $binary
+		}
+
+		#
+		# Alignment
+		#
+		It 'Aligns segment start forward with positive Align' -TestCases @(
+			@{code = '.segment a -Start $1001 -Align 4; lda #1' ; binary = @(0x04,0x10,0xA9,1)}
+		) {
+			($code | Invoke-Assembler -NoHostOutput).Binary | Should -Be $binary
+		}
+
+		It 'Aligns segment from end with negative Align' -TestCases @(
+			@{code = '.segment a -End $10ff -Align -1; lda #1' ; binary = @(0xfe,0x10,0xA9,1)}
+			@{code = '.segment a -End $10ff -Align -256; lda #1' ; binary = @(0x00,0x10,0xA9,1)}
+		) {
+			($code | Invoke-Assembler -NoHostOutput).Binary | Should -Be $binary
+		}
+
+		It 'Throws on invalid alignments' -TestCases @(
+			@{
+				code = '.segment a -Align -1; lda #1'
+				expected = "Cannot find end of address space for segment 'a'"
+			}
+		) {
+			{ $code | Invoke-Assembler -NoHostOutput } |
+				Should -Throw $expected
+		}
+
+
+	}
+}
+
 AfterAll {
 }

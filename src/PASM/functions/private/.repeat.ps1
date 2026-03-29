@@ -5,6 +5,7 @@ function .repeat {
 		[scriptblock]$data
 	)
 
-	0..($count-1) | ForEach-Object { $data.Invoke() }
-
+	if ($count -gt 0) {
+		0..($count-1) | ForEach-Object { $data.Invoke() }
+	}
 }

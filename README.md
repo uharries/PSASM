@@ -116,7 +116,7 @@ Example:
 ### .ascii
 Alias for `.text -AsPETSCII:$false` - See `.text`
 
-### .petcii
+### .petscii
 Alias for `.text -AsPETSCII` - See `.text`
 
 ### .org
@@ -190,3 +190,49 @@ Example:
 ```
 This will load the low 8 bits of the 16 bit value *screen* into the accumulator.
 
+## Advanced Use Cases
+### Using Named Scopes to Create Runtime Objects
+You can define named scopes with code and labels and place code and data in different memory segments like this:
+
+```
+	.segment "CODE" -Start $1000			// Define a "CODE" segment that starts at memory address $1000
+	.segment "DATA" -Start $2000			// Define a "DATA" segment that starts at memory address $2000
+
+MyObject: {									// Create a label and a scope named MyObject
+	$SomeVar = 42
+
+	.pushsegment "DATA"						// Push current segment on stack and switch to "DATA" segment
+
+	Message:	.petscii "hello world!", 0	// Define a label and a zero terminated PETSCII message
+
+	.popsegment								// Pop previous segment from stack
+
+	.pushsegment "CODE"						// Push current segment on stack and switch to "CODE" segment
+
+	.macro PrintMessage {					// Define a macro named PrintMessage
+		ldx #0
+	:	lda Message,x						// Load character from label MyObject.Message
+		beq :+
+		jsr $ffd2							// Print character
+		inx
+		bne :-
+	:
+	}
+
+	.popsegment								// Pop previous segment from stack
+
+	Write-Host $SomeVar						// Output text to the console: 42
+}
+
+
+	.segment "CODE"							// Switch to segment "CODE"
+Start: {									// Create a label and a scope named Start
+	$SomeOtherVar = 67
+	MyObject.PrintMessage()					// Emit the PrintMessage() macro from MyObject scope
+	rts
+
+	Write-Host $SomeVar						// Outputs an empty string to the console, as $SomeVar is not found in current or parent scopes
+	Write-Host $SomeOtherVar				// Outputs the text '67' to the console
+}
+```
+PowerShell does not provide any way to refer to PowerShell variables in sibling scopes, so if you want to access $SomeVar from different sibling scopes, you need to place the variable in a common parent scope.
