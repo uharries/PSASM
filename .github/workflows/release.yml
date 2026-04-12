@@ -1,0 +1,271 @@
+# .github/workflows/release.yml
+#
+# PASM Module Release Pipeline
+# ─────────────────────────────────────────────────────────────────────────────
+# Trigger by pushing a version tag. The tag IS the version — what you tag
+# is exactly what gets published. The .psd1 in source control keeps a
+# placeholder version (e.g. 0.0.0) and is only stamped at build time.
+#
+#   Stable release:     git tag v1.4.0           && git push --tags
+#   Pre-release/beta:   git tag v1.4.0-beta.1    && git push --tags
+#   Pre-release/prev:   git tag v1.4.0-preview.2 && git push --tags
+#
+# Secrets required (repo Settings → Secrets → Actions):
+#   PSGALLERY_API_KEY   — your NuGet/PSGallery API key
+#
+# The publish step is guarded by the secret being present, so the entire
+# workflow runs correctly without it.
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'          # matches v1.4.0, v1.4.0-beta.1, v1.4.0-preview.2, etc.
+
+permissions:
+  contents: write     # needed to create GitHub Releases and upload assets
+
+jobs:
+  release:
+    name: Build and publish
+    runs-on: windows-latest   # PowerShell module — native Windows runner avoids cross-platform quirks
+
+    steps:
+
+      # ── 1. Checkout ────────────────────────────────────────────────────────
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── 2. Parse the tag ───────────────────────────────────────────────────
+      # The tag is the version. Examples:
+      #   v1.4.0        → version=1.4.0  isPreRelease=false  preLabel=
+      #   v1.4.0-beta.1 → version=1.4.0  isPreRelease=true   preLabel=beta.1
+      #
+      # PSGallery prerelease strings must be alphanumeric only (no dots),
+      # so beta.1 → beta1, preview.2 → preview2.
+      - name: Parse tag
+        id: tag
+        shell: pwsh
+        run: |
+          $tag  = "${{ github.ref_name }}"
+          $bare = $tag -replace '^v', ''
+
+          if ($bare -match '-') {
+            $isPreRelease = $true
+            $version      = $bare -replace '-.*$', ''
+            $preLabel     = $bare -replace '^[^-]+-', ''
+            $psGalleryLabel = $preLabel -replace '[^a-zA-Z0-9]', ''
+          } else {
+            $isPreRelease   = $false
+            $version        = $bare
+            $preLabel       = ''
+            $psGalleryLabel = ''
+          }
+
+          Write-Host "Tag            : $tag"
+          Write-Host "Version        : $version"
+          Write-Host "Pre-release    : $isPreRelease"
+          Write-Host "Pre-label      : $preLabel"
+          Write-Host "PSGallery label: $psGalleryLabel"
+
+          "tag=$tag"                                               >> $env:GITHUB_OUTPUT
+          "version=$version"                                       >> $env:GITHUB_OUTPUT
+          "is_prerelease=$($isPreRelease.ToString().ToLower())"   >> $env:GITHUB_OUTPUT
+          "pre_label=$preLabel"                                    >> $env:GITHUB_OUTPUT
+          "psgallery_label=$psGalleryLabel"                       >> $env:GITHUB_OUTPUT
+
+      # ── 3. Install dependencies ────────────────────────────────────────────
+      - name: Install required modules
+        shell: pwsh
+        run: |
+          $modules = @{
+            'PSScriptAnalyzer' = '1.24.0'
+            'Pester'           = '5.6.1'
+          }
+          foreach ($m in $modules.Keys) {
+            $minVer    = $modules[$m]
+            $installed = Get-PSResource -Name $m -Version "[$minVer, ]" -ErrorAction SilentlyContinue |
+                         Sort-Object Version -Descending | Select-Object -First 1
+            if (-not $installed) {
+              Write-Host "Installing $m >= $minVer ..."
+              Install-PSResource -Name $m -Version "[$minVer, ]" -Scope CurrentUser -TrustRepository
+            } else {
+              Write-Host "$m $($installed.Version) already available"
+            }
+          }
+
+      # ── 4. Stamp version into manifest ─────────────────────────────────────
+      # Writes the tag version into PASM.psd1 and VersionInfo.ps1.
+      # The source-controlled .psd1 keeps a placeholder (e.g. 0.0.0) —
+      # the real version only ever exists in the build artifact.
+      - name: Stamp version into manifest
+        id: version
+        shell: pwsh
+        run: |
+          $moduleName   = 'PASM'
+          $sourcePath   = Join-Path (Resolve-Path ./src) $moduleName
+          $manifestPath = Join-Path $sourcePath "$moduleName.psd1"
+          $versionInfo  = Join-Path $sourcePath 'globals' 'VersionInfo.ps1'
+
+          $version        = '${{ steps.tag.outputs.version }}'
+          $isPreRelease   = '${{ steps.tag.outputs.is_prerelease }}' -eq 'true'
+          $psGalleryLabel = '${{ steps.tag.outputs.psgallery_label }}'
+          $buildDate      = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss UTCz')
+
+          Write-Host "Stamping version $version into manifest" -ForegroundColor Cyan
+
+          $psd1 = Get-Content $manifestPath -Raw
+
+          # Stamp the module version
+          $psd1 = $psd1 -replace "ModuleVersion\s*=\s*'[^']+'", "ModuleVersion = '$version'"
+
+          # Stamp or clear the PSGallery prerelease label
+          if ($isPreRelease) {
+            if ($psd1 -match "Prerelease\s*=\s*'[^']*'") {
+              $psd1 = $psd1 -replace "Prerelease\s*=\s*'[^']*'", "Prerelease = '$psGalleryLabel'"
+            } else {
+              $psd1 = $psd1 -replace "(PSData\s*=\s*@\{)", "`$1`n        Prerelease = '$psGalleryLabel'"
+            }
+          } else {
+            $psd1 = $psd1 -replace "Prerelease\s*=\s*'[^']*'", "Prerelease = ''"
+          }
+
+          Set-Content $manifestPath $psd1 -Encoding UTF8 -Force
+
+          # Stamp VersionInfo.ps1
+          @(
+            "# Auto-generated by CI - DO NOT EDIT",
+            "`$script:ModuleVersion   = [version]'$version'",
+            "`$script:ModuleBuildDate = '$buildDate'"
+           ) -join "`n" | Set-Content $versionInfo -Encoding UTF8 -Force
+
+          "build_date=$buildDate" >> $env:GITHUB_OUTPUT
+          Write-Host "✅ Manifest stamped: $version  ($buildDate)" -ForegroundColor Green
+
+      # ── 5. Lint ────────────────────────────────────────────────────────────
+      - name: Run PSScriptAnalyzer
+        shell: pwsh
+        run: |
+          $moduleName = 'PASM'
+          $sourcePath = Join-Path (Resolve-Path ./src) $moduleName
+          $modulePath = Join-Path $sourcePath "$moduleName.psm1"
+
+          $results = Invoke-ScriptAnalyzer `
+            -Path        $modulePath `
+            -Settings    PSScriptAnalyzerSettings.psd1 `
+            -IncludeDefaultRules `
+            -Verbose:$false
+
+          if ($results) {
+            $results | Format-Table -AutoSize
+            $errors = $results | Where-Object { $_.Severity -eq 'Error' }
+            if ($errors) {
+              throw "PSScriptAnalyzer found $($errors.Count) error(s). Fix before releasing."
+            }
+          } else {
+            Write-Host '✅ PSScriptAnalyzer: no issues' -ForegroundColor Green
+          }
+
+      # ── 6. Run Pester tests ────────────────────────────────────────────────
+      # Stable:     all tests must pass — any failure blocks the release.
+      # Pre-release: failures are reported but the release continues.
+      - name: Run Pester tests
+        id: pester
+        shell: pwsh
+        run: |
+          $isPreRelease = '${{ steps.tag.outputs.is_prerelease }}' -eq 'true'
+
+          $config = New-PesterConfiguration
+          $config.CodeCoverage.Enabled = $false
+          $config.Output.Verbosity     = 'Detailed'
+          $config.Run.PassThru         = $true
+
+          $result = Invoke-Pester -Configuration $config
+
+          "tests_passed=$($result.PassedCount)" >> $env:GITHUB_OUTPUT
+          "tests_failed=$($result.FailedCount)" >> $env:GITHUB_OUTPUT
+          "tests_total=$($result.TotalCount)"   >> $env:GITHUB_OUTPUT
+
+          if ($result.FailedCount -gt 0) {
+            if ($isPreRelease) {
+              Write-Warning "$($result.FailedCount) test(s) failed — continuing because this is a pre-release."
+            } else {
+              throw "$($result.FailedCount) test(s) failed. Stable releases require all tests to pass."
+            }
+          } else {
+            Write-Host "✅ All $($result.PassedCount) tests passed" -ForegroundColor Green
+          }
+
+      # ── 7. Build release artifact ──────────────────────────────────────────
+      - name: Build release artifact
+        shell: pwsh
+        run: |
+          $moduleName  = 'PASM'
+          $sourcePath  = Join-Path (Resolve-Path ./src) $moduleName
+          $outputPath  = './build'
+          $destination = Join-Path $outputPath $moduleName
+
+          if (-not (Test-Path $outputPath))  { New-Item -Path $outputPath -ItemType Directory -Force | Out-Null }
+          if (Test-Path $destination)        { Remove-Item -Path $destination -Recurse -Force }
+
+          Copy-Item -Path $sourcePath -Destination $destination -Recurse -Force
+          Write-Host "✅ Artifact at: $destination" -ForegroundColor Green
+
+      # ── 8. Zip the artifact ────────────────────────────────────────────────
+      - name: Create zip archive
+        id: zip
+        shell: pwsh
+        run: |
+          $version    = '${{ steps.tag.outputs.version }}'
+          $zipName    = "PASM-$version.zip"
+          $zipPath    = "./build/$zipName"
+
+          Compress-Archive -Path './build/PASM' -DestinationPath $zipPath -Force
+          Write-Host "✅ Zipped: $zipPath" -ForegroundColor Green
+
+          "zip_path=$zipPath" >> $env:GITHUB_OUTPUT
+          "zip_name=$zipName" >> $env:GITHUB_OUTPUT
+
+      # ── 9. Publish to PSGallery ────────────────────────────────────────────
+      # Skipped silently when PSGALLERY_API_KEY secret is not configured.
+      # Add the secret in repo Settings → Secrets → Actions to activate.
+      - name: Publish to PSGallery
+        if: ${{ env.PSGALLERY_API_KEY != '' }}
+        env:
+          PSGALLERY_API_KEY: ${{ secrets.PSGALLERY_API_KEY }}
+        shell: pwsh
+        run: |
+          Write-Host "Publishing PASM ${{ steps.tag.outputs.version }} to PSGallery..." -ForegroundColor Cyan
+          Publish-Module -Path './build/PASM' -NuGetApiKey $env:PSGALLERY_API_KEY -Repository PSGallery
+          Write-Host "✅ Published to PSGallery" -ForegroundColor Green
+
+      # ── 10. Create GitHub Release ──────────────────────────────────────────
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name:   ${{ steps.tag.outputs.tag }}
+          name:       PASM ${{ steps.tag.outputs.version }}
+          prerelease: ${{ steps.tag.outputs.is_prerelease }}
+          files:      ${{ steps.zip.outputs.zip_path }}
+          body: |
+            ## PASM ${{ steps.tag.outputs.version }}
+
+            **Build date:** ${{ steps.version.outputs.build_date }}
+            **Tests:** ${{ steps.pester.outputs.tests_passed }} passed / ${{ steps.pester.outputs.tests_failed }} failed / ${{ steps.pester.outputs.tests_total }} total
+
+            ### Install from PSGallery
+            ```powershell
+            # Stable
+            Install-Module PASM
+
+            # Pre-release
+            Install-Module PASM -AllowPrerelease
+            ```
+
+            ### Install from this release
+            Download `PASM-${{ steps.tag.outputs.version }}.zip`, extract, then:
+            ```powershell
+            Import-Module .\PASM\PASM.psm1
+            ```
