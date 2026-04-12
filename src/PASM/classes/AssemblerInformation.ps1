@@ -11,6 +11,7 @@ class AssemblerInformation {
 	[byte[]]$Binary
 	[string]$BinaryList
 	[string]$BinaryHash
+	[string]$SegmentInfo
 
 	AssemblerInformation([array]$params) {
 		$this.Success = $params.Success
@@ -24,6 +25,7 @@ class AssemblerInformation {
 		$this.Binary = $params.Binary
 		$this.BinaryList = $params.BinaryList
 		$this.BinaryHash = $params.BinaryHash
+		$this.SegmentInfo = $params.SegmentInfo
 	}
 
 	AssemblerInformation() {}

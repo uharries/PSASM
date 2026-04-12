@@ -439,8 +439,8 @@ Describe 'Segment Handling' {
 		}
 
 		It 'Aligns segment from end with negative Align' -TestCases @(
-			@{code = '.segment a -End $10ff -Align -1; lda #1' ; binary = @(0xfe,0x10,0xA9,1)}
-			@{code = '.segment a -End $10ff -Align -256; lda #1' ; binary = @(0x00,0x10,0xA9,1)}
+			@{code = '.segment a -End 7 -Align -1; lda #1' ; binary = @(0,0,0,0,0,0,0,0,0xA9,1)}
+			@{code = '.segment a -End $ff -Align -256; lda #1' ; binary = @(0,0,0xA9,1) + @(0) * 254}
 		) {
 			($code | Invoke-Assembler -NoHostOutput).Binary | Should -Be $binary
 		}
@@ -458,6 +458,301 @@ Describe 'Segment Handling' {
 
 	}
 }
+
+
+
+Describe 'Segment Handling' {
+    Context 'Placement' {
+        It 'Places code at explicit start address' -TestCases @(
+            @{ code = '.segment a -Start $1000; lda #1' ; binary = @(0x00,0x10, 0xA9,1) }
+        ) { ($code | Invoke-Assembler -NoHostOutput).Binary | Should -Be $binary }
+
+        It 'Derives start from End and Size' -TestCases @(
+            @{ code = '.segment a -End $1003 -Size 4; lda #1' ; binary = @(0x00,0x10, 0xA9,1) }
+        ) { ($code | Invoke-Assembler -NoHostOutput).Binary | Should -Be $binary }
+
+        It 'Derives end from Start and Size' -TestCases @(
+            @{ code = '.segment a -Start $1000 -Size 4; lda #1' ; binary = @(0x00,0x10, 0xA9,1) }
+        ) { ($code | Invoke-Assembler -NoHostOutput).Binary | Should -Be $binary }
+
+        It 'Derives size from Start and End' -TestCases @(
+            @{ code = '.segment a -Start $1000 -End $1003; lda #1' ; binary = @(0x00,0x10, 0xA9,1) }
+        ) { ($code | Invoke-Assembler -NoHostOutput).Binary | Should -Be $binary }
+    }
+
+    Context 'StartAfter' {
+        It 'Places segment immediately after another' -TestCases @(
+            @{
+                code = @'
+.segment a -Start $1000; lda #1
+.segment b -StartAfter a; lda #2
+'@
+                binary = @(0x00,0x10, 0xA9,1, 0xA9,2)
+            }
+        ) { ($code | Invoke-Assembler -NoHostOutput).Binary | Should -Be $binary }
+
+        It 'Chains multiple StartAfter segments' -TestCases @(
+            @{
+                code = @'
+.segment a -Start $0800; lda #1
+.segment b -StartAfter a; lda #2
+.segment c -StartAfter b; lda #3
+'@
+                binary = @(0x00,0x08, 0xA9,1, 0xA9,2, 0xA9,3)
+            }
+        ) { ($code | Invoke-Assembler -NoHostOutput).Binary | Should -Be $binary }
+
+        It 'StartAfter works with Size constraint' -TestCases @(
+            @{
+                code = @'
+.segment a -Start $1000; lda #1
+.segment b -StartAfter a -Size 4; lda #2
+'@
+                binary = @(0x00,0x10, 0xA9,1, 0xA9,2)
+            }
+        ) { ($code | Invoke-Assembler -NoHostOutput).Binary | Should -Be $binary }
+
+        It 'StartAfter works with End constraint' -TestCases @(
+            @{
+                code = @'
+.segment a -Start $1000; lda #1
+.segment b -StartAfter a -End $1005; lda #2
+'@
+                binary = @(0x00,0x10, 0xA9,1, 0xA9,2)
+            }
+        ) { ($code | Invoke-Assembler -NoHostOutput).Binary | Should -Be $binary }
+    }
+
+    Context 'Fill' {
+        It 'Fills segment to End with default fill byte' -TestCases @(
+            @{ code = '.segment a -Start $1000 -End $1003 -Fill; lda #1' ; binary = @(0x00,0x10, 0xA9,1,0,0) }
+        ) { ($code | Invoke-Assembler -NoHostOutput).Binary | Should -Be $binary }
+
+        It 'Fills with custom single FillByte' -TestCases @(
+            @{ code = '.segment a -Start $1000 -End $1003 -Fill -FillBytes $FF; lda #1' ; binary = @(0x00,0x10, 0xA9,1,0xFF,0xFF) }
+        ) { ($code | Invoke-Assembler -NoHostOutput).Binary | Should -Be $binary }
+
+        It 'Fills with repeating FillBytes pattern' -TestCases @(
+            @{ code = '.segment a -Start $1000 -End $1005 -Fill -FillBytes $AA,$BB; lda #1' ; binary = @(0x00,0x10, 0xA9,1,0xAA,0xBB,0xAA,0xBB) }
+        ) { ($code | Invoke-Assembler -NoHostOutput).Binary | Should -Be $binary }
+
+        It 'Fills segment to Size' -TestCases @(
+            @{ code = '.segment a -Start $1000 -Size 4 -Fill; lda #1' ; binary = @(0x00,0x10, 0xA9,1,0,0) }
+        ) { ($code | Invoke-Assembler -NoHostOutput).Binary | Should -Be $binary }
+    }
+
+    Context 'Alignment' {
+        It 'Aligns segment start forward with positive Align' -TestCases @(
+            @{ code = '.segment a -Start $1001 -Align 4; lda #1' ; binary = @(0x04,0x10, 0xA9,1) }
+            @{ code = '.segment a -Start $1000 -Align 4; lda #1' ; binary = @(0x00,0x10, 0xA9,1) }  # already aligned
+            @{ code = '.segment a -Start $1001 -Align 256; lda #1' ; binary = @(0x00,0x11, 0xA9,1) }  # page align
+        ) { ($code | Invoke-Assembler -NoHostOutput).Binary | Should -Be $binary }
+
+        It 'Positive Align with Fill pads before aligned content' -TestCases @(
+            @{ code = '.segment a -Start $1001 -End $1005 -Align 4 -Fill; lda #1' ; binary = @(0x01,0x10, 0,0,0, 0xA9,1) }
+        ) { ($code | Invoke-Assembler -NoHostOutput).Binary | Should -Be $binary }
+
+        It 'Negative Align anchors content to alignment boundary near end' -TestCases @(
+            @{ code = '.segment a -End 7 -Align -1; lda #1' ; binary = @(0,0, 0,0,0,0,0,0, 0xA9,1) }
+            @{ code = '.segment a -End $ff -Align -256; lda #1' ; binary = @(0,0, 0xA9,1) + @(0) * 254 }
+        ) { ($code | Invoke-Assembler -NoHostOutput).Binary | Should -Be $binary }
+
+        It 'Negative Align with explicit Start fills full range' -TestCases @(
+            @{ code = '.segment a -Start $1000 -End $100f -Align -8 -FillBytes $EA; lda #1' ; binary = @(0x00,0x10, 0xEA,0xEA,0xEA,0xEA,0xEA,0xEA,0xEA,0xEA, 0xA9,1,0xEA,0xEA,0xEA,0xEA,0xEA,0xEA) }
+        ) { ($code | Invoke-Assembler -NoHostOutput).Binary | Should -Be $binary }
+    }
+
+    Context 'Virtual' {
+        It 'Virtual segment emits no bytes' -TestCases @(
+            @{
+                code = @'
+.segment v -Start $1000 -Virtual; lda #1
+.segment r -StartAfter v; lda #2
+'@
+                binary = @(0x02,0x10, 0xA9,2)
+            }
+        ) { ($code | Invoke-Assembler -NoHostOutput).Binary | Should -Be $binary }
+
+        It 'Virtual segment still advances address for StartAfter' -TestCases @(
+            @{
+                code = @'
+.segment v -Virtual; .fill 5 { 0 }
+.segment r -StartAfter v; lda #1
+'@
+                binary = @(0x05,0x00, 0xA9,1)
+            }
+        ) { ($code | Invoke-Assembler -NoHostOutput).Binary | Should -Be $binary }
+    }
+
+    Context 'AllowOverlap' {
+        It 'Allows segment to be overlapped when AllowOverlap is set' -TestCases @(
+            @{
+                code = @'
+.segment a -Start $1000 -Size 4 -Fill -AllowOverlap
+.segment b -Start $1002; lda #1
+'@
+                binary = @(0x00,0x10, 0,0, 0xA9,1)
+            }
+        ) { ($code | Invoke-Assembler -NoHostOutput).Binary | Should -Be $binary }
+
+        It 'Later segment overwrites fill of earlier AllowOverlap segment' -TestCases @(
+            @{
+                code = @'
+.segment a -Start $1000 -Size 4 -Fill -FillBytes $FF -AllowOverlap
+.segment b -Start $1002; lda #1
+'@
+                binary = @(0x00,0x10, 0xFF,0xFF, 0xA9,1)
+            }
+        ) { ($code | Invoke-Assembler -NoHostOutput).Binary | Should -Be $binary }
+    }
+
+    Context 'Re-entry' {
+        It 'Switching back to a segment continues emitting into it' -TestCases @(
+            @{
+                code = @'
+.segment a -Start $1000; lda #1
+.segment b -Start $1010; lda #2
+.segment a; lda #3
+'@
+                binary = @(0x00,0x10, 0xA9,1,0xA9,3) + @(0)*12 + @(0xA9,2)
+            }
+        ) { ($code | Invoke-Assembler -NoHostOutput).Binary | Should -Be $binary }
+
+        It 'Re-entry ignores repeated parameters silently' -TestCases @(
+            @{
+                code = @'
+.segment a -Start $1000; lda #1
+.segment a -Start $2000; lda #2
+'@
+                binary = @(0x00,0x10, 0xA9,1,0xA9,2)  # $2000 is ignored
+            }
+        ) { ($code | Invoke-Assembler -NoHostOutput).Binary | Should -Be $binary }
+    }
+
+    Context 'Push/Pop' {
+        It 'Pushsegment and popsegment restore context correctly' -TestCases @(
+            @{
+                code = @'
+.segment code -Start 2; lda #1
+.pushsegment data -StartAfter code; .fill 2 { $_ }
+.popsegment; lda #3
+'@
+                binary = @(0x02,0x00, 0xA9,1,0xA9,3, 0,1)
+            }
+        ) { ($code | Invoke-Assembler -NoHostOutput).Binary | Should -Be $binary }
+
+        It 'Nested push/pop restores correct segment at each level' -TestCases @(
+            @{
+                code = @'
+.segment a -Start $1000; lda #1
+.pushsegment b -Start $2000; lda #2
+.pushsegment c -Start $3000; lda #3
+.popsegment; lda #4
+.popsegment; lda #5
+'@
+                binary = @(0x00,0x10, 0xA9,1,0xA9,5) + @(0)*0xFFc + @(0xA9,2,0xA9,4) + @(0)*0xFFc + @(0xA9,3)
+            }
+        ) { ($code | Invoke-Assembler -NoHostOutput).Binary | Should -Be $binary }
+    }
+
+    Context 'Error cases' {
+        It 'Throws on invalid parameter combinations' -TestCases @(
+            @{ code = '.segment a -Start $1000 -End $1003 -Size 4; lda #1' ; expected = "Cannot specify both End and Size*" }
+            @{ code = '.segment a -Start $1000 -StartAfter b; lda #1'      ; expected = "Cannot specify both Start and StartAfter*" }
+            @{ code = '.segment a -StartAfter b -End $1003 -Size 4'        ; expected = "Cannot specify both End and Size*" }
+        ) { { $code | Invoke-Assembler -NoHostOutput } | Should -Throw $expected }
+
+        It 'Throws when segment exceeds Size' -TestCases @(
+            @{ code = '.segment a -Size 1; lda #1; lda #2' ; expected = "Segment 'a' exceeds defined Size*" }
+        ) { { $code | Invoke-Assembler -NoHostOutput } | Should -Throw $expected }
+
+        It 'Throws when segment exceeds End' -TestCases @(
+            @{ code = '.segment a -Start $1000 -End $1001; lda #1; lda #2' ; expected = "Segment 'a' exceeds defined End*" }
+        ) { { $code | Invoke-Assembler -NoHostOutput } | Should -Throw $expected }
+
+        It 'Throws on overlap without AllowOverlap' -TestCases @(
+            @{
+                code = @'
+.segment a -Start $2000; lda #1
+.segment b -Start $2001; lda #2
+'@
+                expected = "Segment 'b' overlaps 'a'*"
+            }
+        ) { { $code | Invoke-Assembler -NoHostOutput } | Should -Throw $expected }
+
+        It 'Throws on negative align without End' -TestCases @(
+            @{ code = '.segment a -Align -1; lda #1' ; expected = "Cannot find end of address space*" }
+        ) { { $code | Invoke-Assembler -NoHostOutput } | Should -Throw $expected }
+
+        It 'Throws on stack underflow' -TestCases @(
+            @{ code = '.popsegment' ; expected = "Segment stack underflow*" }
+        ) { { $code | Invoke-Assembler -NoHostOutput } | Should -Throw $expected }
+    }
+
+	Context 'Run Address' {
+		It 'Labels resolve to run address, bytes placed at load address' -TestCases @(
+			@{
+				code   = '.segment c -Start $1000 -Run $2000; lab: lda lab'
+				binary = @(0x00,0x10, 0xAD,0x00,0x20)  # bytes at $1000, label resolves to $2000
+			}
+		) { ($code | Invoke-Assembler -NoHostOutput).Binary | Should -Be $binary }
+
+		It 'Multiple labels all resolve to run address space' -TestCases @(
+			@{
+				code = @'
+.segment c -Start $1000 -Run $2000
+lab1: lda lab1
+	lda lab2
+lab2: nop
+'@
+				binary = @(0x00,0x10, 0xAD,0x00,0x20, 0xAD,0x06,0x20, 0xEA)
+			}
+		) { ($code | Invoke-Assembler -NoHostOutput).Binary | Should -Be $binary }
+
+		It 'Run address does not affect binary load position' -TestCases @(
+			@{
+				# Two segments at same load addresses but different run addresses
+				# should still be placed correctly in binary
+				code = @'
+.segment a -Start $1000 -Run $2000
+	nop
+.segment b -StartAfter a -Run $3000
+	nop
+'@
+				binary = @(0x00,0x10, 0xEA, 0xEA)
+			}
+		) { ($code | Invoke-Assembler -NoHostOutput).Binary | Should -Be $binary }
+
+		It 'PC is run-address based within segment' -TestCases @(
+			@{
+				# .word * should emit the run address, not load address
+				code   = '.segment c -Start $1000 -Run $2000; .word *'
+				binary = @(0x00,0x10, 0x00,0x20)
+			}
+		) { ($code | Invoke-Assembler -NoHostOutput).Binary | Should -Be $binary }
+
+		It 'Without -Run, PC equals load address' -TestCases @(
+			@{
+				code   = '.segment c -Start $1000; lab: lda lab'
+				binary = @(0x00,0x10, 0xAD,0x00,0x10)
+			}
+		) { ($code | Invoke-Assembler -NoHostOutput).Binary | Should -Be $binary }
+
+		It 'Run address works with StartAfter' -TestCases @(
+			@{
+				code = @'
+.segment a -Start $1000
+	nop
+.segment b -StartAfter a -Run $2000
+	lab: lda lab
+'@
+				binary = @(0x00,0x10, 0xEA, 0xAD,0x00,0x20)
+			}
+		) { ($code | Invoke-Assembler -NoHostOutput).Binary | Should -Be $binary }
+	}
+}
+
+
 
 AfterAll {
 }

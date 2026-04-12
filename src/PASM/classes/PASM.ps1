@@ -171,12 +171,14 @@ class PASM {
 				# Write-Error -Message ("Error in psSource line {0}, column {1}: {2} '{3}' {4}" -f $error[0].InvocationInfo.ScriptLineNumber, $error[0].InvocationInfo.OffsetInLine, $error[0].CategoryInfo.Reason, $error[0].CategoryInfo.TargetName, $error[0].Exception.Message)
 				# Write-Error -Message ("Error in psSource line {0}, column {1}: {2} '{3}'" -f $error[0].InvocationInfo.ScriptLineNumber, $error[0].InvocationInfo.OffsetInLine, $error[0].CategoryInfo.Reason, $error[0].CategoryInfo.TargetName) -ErrorAction Stop
 				if ($psError) {
+					$_.Exception.Data["TOKENS"] = $this.parser.inTokens
 					if(-not $this.NoHostOutput) {
 						Write-Host " FAILED!"
 						Write-Host "Error in executing generated PowerShell source code!"
 						Write-Host $this.psSource
 						Write-Host "Scopes: $($this.symbolManager.Scopes | ft -auto | out-string)"
 						Write-Host "SymbolTable: $($this.symbolManager.GetFullSymbolTable() | ft -auto | out-string)"
+						Write-Host "Look at `$Error[0].Exception.Data['TOKENS'] for the tokens"
 					}
 					throw $_
 					# throw [System.Exception]::new(("Error in psSource line {0}, column {1}: {2} '{3}'" -f $psError[0].InvocationInfo.ScriptLineNumber, $psError[0].InvocationInfo.OffsetInLine, $psError[0].CategoryInfo.Reason, $psError[0].CategoryInfo.TargetName))
@@ -247,6 +249,7 @@ class PASM {
 			Binary = $this.binary
 			BinaryList = $this.HexDump()
 			BinaryHash = $this.binaryHash
+			SegmentInfo = $this.Segments.DumpSegments()
 		}
 
 		return ([AssemblerInformation]::new($asmInfoParams))

@@ -32,6 +32,10 @@ function .inst {
 	# 	}
 	# }
 
+	if (-not [MOS6502]::opcodes.$Mnemonic.ContainsKey($AddressingMode)) {
+		throw "Unknown addressing mode '$AddressingMode' for mnemonic '$Mnemonic' at line $InvocationLine in file '$InvocationFile'."
+	}
+
 	if($Operand -lt 256) {
 		switch ($AddressingMode) {
 			'Absolute' {

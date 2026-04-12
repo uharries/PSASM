@@ -1,3 +1,3 @@
 # Auto-generated – DO NOT EDIT
-$script:ModuleVersion   = [version]'0.1.31'
-$script:ModuleBuildDate = '2026-03-28 18:29:54 UTC+1'
+$script:ModuleVersion   = [version]'0.1.35'
+$script:ModuleBuildDate = '2026-04-12 02:30:19 UTC+2'

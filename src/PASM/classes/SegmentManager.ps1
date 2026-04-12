@@ -24,6 +24,7 @@ class Segment {
 	[int]$Align				# Negative alignment implies fill before alignment from end
 	[bool]$Fill				# If true, fills to realEnd with FillByte
 	[byte]$FillByte			# Byte to use when filling
+	[byte[]]$FillBytes		# Bytes to use when filling
 	[bool]$AllowOverlap		# If true, allows other segments to overlap this one. StartAfter implies AllowOverlap on the segment referenced, unless Fill or negative Align is specified on the referenced segtment.
 	[bool]$Virtual			# If true, segment is virtual and does not emit bytes
 	[int]$PC				# Maintained as $RunAddress + $relativePC
@@ -33,6 +34,7 @@ class Segment {
 	[int]$realStart			# The actual calculated start address after layout is solved
 	[int]$realEnd			# The actual calcullated end address after layout is solved (Not redundant, as realStart may not be known)
 	[int]$relativeMinPC		# Lowest address used in this segment
+	[int]$contentOffset		# When negative alignment is used, this tracks where the content should be placed within the segment
 	[System.Collections.Generic.List[object]]$Chunks	# List of chunks in this segment
 
 	Segment([string]$name) {
@@ -40,6 +42,7 @@ class Segment {
 		$this.Align = 0
 		$this.Fill = $false
 		$this.FillByte = 0
+		$this.FillBytes = @(0)
 		$this.AllowOverlap = $false
 		$this.Virtual = $false
 		$this.relativePC = 0
@@ -49,6 +52,7 @@ class Segment {
 		$this.realStart = -1
 		$this.realSize = -1
 		$this.realEnd = -1
+		$this.contentOffset = 0
 		$this.Chunks = [System.Collections.Generic.List[Chunk]]::new()
 	}
 
@@ -68,13 +72,15 @@ class Segment {
 
 	[void] Reset() {
 		$this.Chunks.Clear()
-		$this.SetPC($this.realStart -lt 0 ? 0 : $this.realStart)
+		$this.relativePC = 0
+		$this.PC = $this.RunAddress -ge 0 ? $this.RunAddress + $this.relativePC : $this.realStart -ge 0 ? $this.realStart + $this.relativePC : $this.relativePC
 		$this.relativeMaxPC = -1
 		$this.relativeMinPC = -1
 	}
 
 	[int] GetEffectiveBaseAddress() {
-		return ($this.RunAddress -lt 0) ? $this.realStart -lt 0 ? 0 : $this.realStart : $this.RunAddress
+		# return ($this.RunAddress -lt 0) ? $this.realStart -lt 0 ? $this.StartAddress -lt 0 ? 0 : $this.StartAddress : $this.realStart : $this.RunAddress
+		return $this.realStart -lt 0 ? $this.StartAddress -lt 0 ? 0 : $this.StartAddress : $this.realStart
 	}
 
 	[void] SetPC([int]$addr) {
@@ -108,6 +114,7 @@ class SegmentManager {
 		$newSegment.Align = 0
 		$newSegment.Fill = $false
 		$newSegment.FillByte = 0x00
+		$newSegment.FillBytes = @(0x00)
 		$newSegment.AllowOverlap = $true
 		$newSegment.Virtual = $false
 		$newSegment.realStart = -1
@@ -167,11 +174,10 @@ class SegmentManager {
 		# 		$seg.realStart = $seg.StartAddress
 		# 	}
 		# }
-		$orderedSegments = $this.Segments.Values | Sort-Object -Property realStart, Order
-
 		$changed = $true
 		while ($changed) {
 			$changed = $false
+			$orderedSegments = $this.Segments.Values | Sort-Object -Property realStart, Order
 			foreach ($seg in $orderedSegments) {
 				$oldStart = $seg.realStart
 				$oldEnd   = $seg.realEnd
@@ -186,7 +192,7 @@ class SegmentManager {
 				if ($seg.realStart -ge 0) {
 					$start = $seg.realStart
 				} elseif ($seg.StartAddress -ge 0) {
-					$start = $seg.StartAddress + $seg.relativeMinPC
+					$start = $seg.StartAddress + ($seg.relativeMinPC -lt 0 ? 0 : $seg.relativeMinPC)
 				} else {
 					$start = $seg.relativeMinPC
 				}
@@ -214,40 +220,40 @@ class SegmentManager {
 					# if LastAddress exists, anchor to it
 					if ($seg.LastAddress -ge 0) {
 						$latestStart = $seg.LastAddress - $minSize + 1
-						$seg.realStart = $latestStart - ($latestStart % $align)
-						$seg.realEnd = $seg.realStart + $minSize - 1
-						$seg.realSize  = $minSize
+						$alignedContentStart = $latestStart - ($latestStart % $align)
+						$seg.realStart = $seg.StartAddress -ge 0 ? $seg.StartAddress : $alignedContentStart
+						$seg.realEnd   = $seg.LastAddress
+						$seg.realSize  = $seg.realEnd - $seg.realStart + 1
+						# Store where content should go within the segment
+						$seg.contentOffset = $alignedContentStart - $seg.realStart
 					} else {
 						# no LastAddress -> anchor at minimal satisfying page end
 						throw "Cannot find end of address space for segment '$($seg.Name)'"
 					}
-				}
-
-				# Positive / Normal align
-				if ($seg.Align -ge 0) {
+				} else {
+					# Positive or no Alignment
 					$align = $seg.Align
-					$start = $align -gt 0 ? [math]::Ceiling($start / $align) * $align : $start
+					$alignedContentStart = $align -gt 0 ? [math]::Ceiling($start / $align) * $align : $start
 					$size = $minSize
+
 					# Fill -> LastAddress sets hard end
 					if ($seg.Fill -and $seg.LastAddress -ge 0) {
-						# this is likely not even needed...
-						if ($seg.LastAddress -lt $start) {
-							throw "Segment '$($seg.Name)' Fill end underflows start"
-						}
 						$end  = $seg.LastAddress
 						$size = $end - $start + 1
+						$seg.contentOffset = $alignedContentStart - $start
+					} elseif ($seg.Fill -and $seg.Size -ge 0) {
+						$end  = $start + $seg.Size - 1
+						$size = $seg.Size
+						$seg.contentOffset = $alignedContentStart - $start
 					} else {
-						# non-fill using minimal size
+						# No fill - alignment moves the segment start itself
+						$start = $alignedContentStart
 						$end = $start + $size - 1
-						# LastAddress constraint check
-						# we do this in BuildBinary instead... as this may change as layout resolves
-						# if ($seg.LastAddress -ge 0 -and	$end -gt $seg.LastAddress) {
-						# 	throw "Segment '$($seg.Name)' violates LastAddress boundary"
-						# }
+						$seg.contentOffset = 0
 					}
 					$seg.realStart = $start
 					$seg.realSize  = $size
-					$seg.realEnd   = $start + $size - 1
+					$seg.realEnd   = $end
 				}
 				# detect solved progress
 				if ($seg.realStart -ne $oldStart -or
@@ -282,12 +288,26 @@ class SegmentManager {
 		$binaryEnd   = [int]::MinValue
 
 		foreach ($seg in $orderedSegments) {
-			# Segment contributes if it emits OR forces fill
-			$emits = $seg.relativeMaxPC -gt 0
-			if (-not ($emits -or $seg.Fill) -or $seg.Virtual) { continue }
 
-			$binaryStart = [math]::Min($binaryStart, $seg.realStart)
-			$binaryEnd   = [math]::Max($binaryEnd,   $seg.realEnd)
+			if ($seg.Virtual) { continue }
+
+			# If Fill → segment owns full range
+			if ($seg.Fill) {
+				$binaryStart = [math]::Min($binaryStart, $seg.realStart)
+				$binaryEnd   = [math]::Max($binaryEnd,   $seg.realEnd)
+				continue
+			}
+
+			# Otherwise → only chunks define emitted range
+			foreach ($chunk in $seg.Chunks) {
+				if ($chunk.Virtual -or $chunk.Size -le 0) { continue }
+
+				$start = $seg.realStart + ($chunk.Start - $seg.relativeMinPC)
+				$end   = $start + $chunk.Size - 1
+
+				$binaryStart = [math]::Min($binaryStart, $start)
+				$binaryEnd   = [math]::Max($binaryEnd,   $end)
+			}
 		}
 
 		if ($binaryStart -gt $binaryEnd) {
@@ -322,11 +342,12 @@ class SegmentManager {
 		# emit Fill bytes first
 		foreach ($seg in $orderedSegments) {
 			if (-not $seg.Fill) { continue }
-			$fillVal = $seg.FillByte
+			$fillVal = $seg.FillBytes
 			$start   = $seg.realStart - $binaryStart
 			$end     = $seg.realEnd   - $binaryStart
+
 			for ($i = $start; $i -le $end; $i++) {
-				$buffer[$i] = $fillVal
+				$buffer[$i] = $fillVal[($i - $start) % $fillVal.Count]
 			}
 		}
 
@@ -334,13 +355,14 @@ class SegmentManager {
 		foreach ($seg in $orderedSegments) {
 			foreach ($chunk in $seg.Chunks) {
 				if ($chunk.Virtual -or $chunk.Size -le 0) { continue }
-				$dst = $seg.realStart + ($chunk.Start - $seg.relativeMinPC) - $binaryStart
+				$dst = $seg.realStart + $seg.contentOffset + $chunk.Start - $binaryStart
 				if ($dst -lt 0 -or ($dst + $chunk.Size) -gt $buffer.Count) {
 					### not an error when the layout is still not converged...
 					### realStart may have been updated by SolveLayout(),
 					### but the Chunk start addresses have not and will not be until next pass.
 					### For now, just skip and hope for future pass to resolve
 					### ?CONVERGENCE OUT OF NON-COMPLICATED BOUNDS  ERROR!
+					### I should probably throw if current pass is > 1....
 					continue
 				}
 				for ($i = 0; $i -lt $chunk.Size; $i++) {
@@ -349,6 +371,41 @@ class SegmentManager {
 			}
 		}
 		return $buffer
+	}
+
+
+	[string] DumpSegments() {
+		$orderedSegments = $this.Segments.Values | Sort-Object -Property realStart, Order
+		$lines = [System.Collections.Generic.List[string]]::new()
+
+		foreach ($seg in $orderedSegments) {
+			$start   = $seg.realStart -ge 0 ? ('$' + ('{0:X4}' -f $seg.realStart)) : '????'
+			$end     = $seg.realEnd   -ge 0 ? ('$' + ('{0:X4}' -f $seg.realEnd))   : '????'
+			$size    = $seg.realSize  -ge 0 ? ('$' + ('{0:X4}' -f $seg.realSize))  : '????'
+			$cur     = $seg.Name -eq $this.Current.Name ? ' *' : '  '
+			$content = $seg.relativeMaxPC -lt 0 ? 0 : ($seg.relativeMaxPC - ($seg.relativeMinPC -lt 0 ? 0 : $seg.relativeMinPC))
+
+			$flags = [System.Collections.Generic.List[string]]::new()
+			if ($seg.Virtual)      { $flags.Add('Virtual') }
+			if ($seg.Fill)         { $flags.Add('Fill') }
+			if ($seg.AllowOverlap) { $flags.Add('AllowOverlap') }
+			if ($seg.Align -ne 0)  { $flags.Add("Align=$($seg.Align)") }
+			if ($seg.RunAddress -ge 0 -and $seg.RunAddress -ne $seg.realStart) {
+				$flags.Add('Run=$' + ('{0:X4}' -f $seg.RunAddress))
+			}
+			if ($seg.StartAfter)   { $flags.Add("StartAfter=$($seg.StartAfter)") }
+			$flagStr = $flags.Count -gt 0 ? "  [$($flags -join ', ')]" : ''
+
+			$fillStr = ''
+			if ($seg.Fill) {
+				$fillStr = '  fill=' + (($seg.FillBytes | ForEach-Object { '$' + ('{0:X2}' -f $_) }) -join ',')
+			}
+
+			$name = "$($seg.Name)$cur"
+			$lines.Add("  $($name.PadRight(14)) $start..$end  size=$size  content=$('{0:X4}' -f $content)  chunks=$($seg.Chunks.Count)$flagStr$fillStr")
+		}
+
+		return "Segments ($($this.Segments.Count)):`n" + ($lines -join "`n")
 	}
 
 }

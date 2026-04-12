@@ -236,48 +236,27 @@ class SemanticParser {
 		if ($tokenIndex -gt $this.inTokens.Count) {
 			throw "Parser error: Token index $tokenIndex out of range"
 		}
+
 		$nextTokenIndex = $tokenIndex + 1
 		$token = $this.inTokens[$tokenIndex]
 		if ($this.LineCounter -eq 0) { $this.LineMap.Add(++$this.LineCounter, @{File = $token.Filename; Line = ($token.Line)}) }
 
 		switch($token.Type) {
 			([TokenType]::Label) {
-				$j=1
-				$inInstr=$false
 				$symbolName = $token.Value.Trim(':')
-				while($tokenIndex-$j -ge 0 -and $this.inTokens[$tokenIndex-$j].Type -notin $null, [TokenType]::SemiColon, [TokenType]::NewLine){
-					if($this.inTokens[$tokenIndex-$j++].Type -eq [TokenType]::Mnemonic) {
-						$this.InsertToken($this.outTokens.Count-$j+1, ".label -name $symbolName -scopeId $($this.scopeManager.GetCurrentScope()) -addr ((.pc) + 1);")
-						$inInstr = $true
-						$this.symbolManager.AddUnresolvedSymbol($symbolName, $this.scopeManager.GetCurrentScope(), $token.Line, $token.Column)
-						break
-					}
-				}
-				if(-not $inInstr) {
-					$this.AddToken(".label -name $symbolName -scopeId $($this.scopeManager.GetCurrentScope());")
-					$this.symbolManager.AddUnresolvedSymbol($symbolName, $this.scopeManager.GetCurrentScope(), $token.Line, $token.Column)
-				}
+
+				$this.AddToken(".label -name $symbolName -scopeId $($this.scopeManager.GetCurrentScope());")
+				$this.symbolManager.AddUnresolvedSymbol($symbolName, $this.scopeManager.GetCurrentScope(), $token.Line, $token.Column)
+
 				if ($this.IsNextToken($tokenIndex, [TokenType]::LCurly)) {
 					$this.AddToken("&")
 				}
 			}
 
 			([TokenType]::AnonymousLabel) {
-				$j=1
-				$inInstr=$false
 				$symbolName = "ANON_L$($token.Line)_C$($token.Column)"
-				while($tokenIndex-$j -ge 0 -and $this.inTokens[$tokenIndex-$j].Type -notin $null, [TokenType]::SemiColon, [TokenType]::NewLine){
-					if($this.inTokens[$tokenIndex-$j++].Type -eq [TokenType]::Mnemonic) {
-						$this.InsertToken($this.outTokens.Count-$j+1, ".label -name $symbolName -scopeId $($this.scopeManager.GetCurrentScope()) -addr ((.pc) + 1);")
-						$inInstr = $true
-						$this.symbolManager.AddUnresolvedSymbol($symbolName, $this.scopeManager.GetCurrentScope(), $token.Line, $token.Column)
-						break
-					}
-				}
-				if(-not $inInstr) {
-					$this.AddToken(".label -name $symbolName -scopeId $($this.scopeManager.GetCurrentScope());")
-					$this.symbolManager.AddUnresolvedSymbol($symbolName, $this.scopeManager.GetCurrentScope(), $token.Line, $token.Column)
-				}
+				$this.AddToken(".label -name $symbolName -scopeId $($this.scopeManager.GetCurrentScope());")
+				$this.symbolManager.AddUnresolvedSymbol($symbolName, $this.scopeManager.GetCurrentScope(), $token.Line, $token.Column)
 			}
 
 			([TokenType]::AnonymousReference) {
@@ -473,18 +452,25 @@ class SemanticParser {
 				### Skip whitespace after mnemonic
 				$tokenIndex = $this.Skipwhitespace(++$tokenIndex)
 
-				$this.AddToken(".inst -Mnemonic $($mne)")
-
 				### Relative
-				if($mne -in 'BCC','BCS','BEQ','BMI','BNE','BPL','BVC','BVS') {
-					$addressingMode = [MOS6502AddressingMode]::Relative
-					$this.AddToken(" -AddressingMode $($addressingMode) -Operand (")
-					$tokenIndex = $this.ParseTokens($tokenIndex, $instEndIndex-$tokenIndex)
-					$this.AddToken(")")
-					$this.AddToken(" -InvocationFile '$($token.Filename)' -InvocationLine $($token.Line)")
-					$nextTokenIndex = $tokenIndex
-					break
-				}
+				# if($mne -in 'BCC','BCS','BEQ','BMI','BNE','BPL','BVC','BVS') {
+				# 	$addressingMode = [MOS6502AddressingMode]::Relative
+
+				# 	$startIndex = $this.outTokens.Count
+				# 	$tokenIndex = $this.ParseTokens($tokenIndex, $instEndIndex-$tokenIndex)
+				# 	$endIndex = $this.outTokens.Count
+
+				# 	if ($startIndex -eq $endIndex -or (($this.outTokens[$startIndex..($endIndex-1)].Value -join '') -match '^(?s:\s|<#.*?#>|#.*$|//.*$)*$')) {
+				# 		# If no operand was found or if it only contains whitespace/comments, throw an error
+				# 		throw "Parser error: No operand found for instruction '$mne' at line $($token.Line), column $($token.Column)"
+				# 	}
+
+				# 	$this.InsertToken($startIndex, " -AddressingMode $($addressingMode) -Operand (")
+				# 	$this.AddToken(")")
+				# 	$this.AddToken(" -InvocationFile '$($token.Filename)' -InvocationLine $($token.Line)")
+				# 	$nextTokenIndex = $tokenIndex
+				# 	break
+				# }
 
 				### Implied
 				# if($mne -in 'ASL','CLC','CLD','CLI','CLV','DEX','DEY','INX','INY','LSR','NOP','PHA','PHP','PLA','PLP','ROL','ROR','RTI','RTS','SEC','SED','SEI','TAX','TAY','TSX','TXA','TXS','TYA') {
@@ -496,17 +482,34 @@ class SemanticParser {
 				# }
 
 				### Rest of the addressing modes
-				enum State {Init; Immediate; Absolute; AbsoluteIndexed; AbsoluteIndexedX; AbsoluteIndexedY; Indirect; IndirectAbsolute; IndirectIndexed; IndirectIndexedY; Indexed; IndexedX; IndexedXIndirect}
+				enum State {Init; Immediate; Absolute; AbsoluteIndexed; AbsoluteIndexedX; AbsoluteIndexedY; Indirect; IndirectAbsolute; IndirectIndexed; IndirectIndexedY; Indexed; IndexedX; IndexedXIndirect; Relative}
 
-				$state=[State]::Init
+				if($mne -in 'BCC','BCS','BEQ','BMI','BNE','BPL','BVC','BVS') {
+					$state = [State]::Relative
+				} else {
+					$state = [State]::Init
+				}
+
 				$operandTokensIndex=@()
 				$parenCount=0
 				for($i=$tokenIndex;$i -lt $instEndIndex;$i++) {
 					$tk = $this.inTokens[$i]
 					switch($tk.Type) {
 						([TokenType]::Whitespace) {break}
-						([TokenType]::Label) {$operandTokensIndex+=$i; break}
-						([TokenType]::AnonymousLabel) {$operandTokensIndex+=$i; break}
+						([TokenType]::Label) {
+							$symbolName = $tk.Value
+							$scopeId = $this.scopeManager.GetCurrentScope()
+							$this.AddToken(".label -name $($symbolName) -scopeId $($scopeId) -addr ((.pc) + 1);")
+							$this.symbolManager.AddUnresolvedSymbol($symbolName, $scopeId, $tk.Line, $tk.Column)
+							break
+						}
+						([TokenType]::AnonymousLabel) {
+							$symbolName = "ANON_L$($tk.Line)_C$($tk.Column)"
+							$scopeId = $this.scopeManager.GetCurrentScope()
+							$this.AddToken(".label -name $($symbolName) -scopeId $($scopeId) -addr ((.pc) + 1);")
+							$this.symbolManager.AddUnresolvedSymbol($symbolName, $scopeId, $tk.Line, $tk.Column)
+							break
+						}
 
 						([TokenType]::Hash) {
 							if($state -eq [state]::Init) {$state = [state]::Immediate; break}
@@ -552,6 +555,8 @@ class SemanticParser {
 					}
 				}
 
+				$this.AddToken(".inst -Mnemonic $($mne)")
+
 				if($state -eq [state]::Init) {
 					$addressingMode = [MOS6502AddressingMode]::Implied
 					$this.AddToken(" -AddressingMode $($addressingMode)")
@@ -559,10 +564,21 @@ class SemanticParser {
 					$addressingMode = [MOS6502AddressingMode]$state.ToString()
 					$this.AddToken(" -AddressingMode $($addressingMode) -Operand (")
 
+					$startIndex = $this.outTokens.Count
+					# Go through operand token indices.
 					for($i=0;$i -lt $operandTokensIndex.Count;$i++) {
 						$ti = $this.ParseToken($operandTokensIndex[$i]) - 1
+						# Each time I parse one, skip over any indices that fall inside that parsed range so I don’t process them twice.
 						while($i -lt $operandTokensIndex.Count -and $ti -ge $operandTokensIndex[$i+1]) {$i++}
 					}
+					$endIndex = $this.outTokens.Count
+
+					if ($startIndex -eq $endIndex -or (($this.outTokens[$startIndex..($endIndex-1)].Value -join '') -match '^(?s:\s|<#.*?#>|#.*$|//.*$)*$')) {
+						# If no operand was found or if it only contains whitespace/comments, throw an error
+						throw "Parser error: No operand found for instruction '$mne' in addressing mode '$($addressingMode)' at line $($token.Line), column $($token.Column)"
+					}
+
+					# $this.InsertToken($startIndex, " -AddressingMode $($addressingMode) -Operand (")
 					$this.AddToken(")")
 				}
 				$this.AddToken(" -InvocationFile '$($token.Filename)' -InvocationLine $($token.Line)")
@@ -582,13 +598,21 @@ class SemanticParser {
 				$this.AddToken($token.Value)
 			}
 		}
+
 		return $nextTokenIndex
 	}
+
 
 	[int] ParseTokens([int]$tokenIndex, [int]$count) {
 		for($i=0;$i -lt $count;$i++) {
 			$i = $this.ParseToken($tokenIndex+$i) - $tokenIndex - 1
 		}
 		return $tokenIndex+$i
+	}
+
+
+	# Public entry point — call this to parse everything and populate outTokens
+	[void] ParseAllTokens() {
+		$null = $this.ParseTokens(0, $this.inTokens.Count)
 	}
 }
