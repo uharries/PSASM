@@ -1,6 +1,6 @@
 ![logo](docs/pasm_logo.png)
-# PASM
-> *- An attempt at a PowerShell based assembler*
+# PASM - The PowerShell 6502 Assembler
+> *PASM is a PowerShell-based assembler for 6502/6510-based platforms, created by Ulf Diabelez Harries*
 
 ## Abstract
 This project aims to develop a 6502 cross assembler using PowerShell, harnessing the full capabilities of PowerShell for developers. The assembler’s input source code is converted into PowerShell-compatible code, which is then executed to produce the final binary code. This approach enables developers to utilize the complete range of PowerShell functionalities in generating the resulting binary code.

@@ -1,0 +1,1360 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/your-org/pasm/language/pasm-language.json",
+  "Name": "PASM",
+  "Version": "1.0.0",
+  "description": "PASM is a PowerShell-hosted 6502 assembler DSL. It is a strict superset of PowerShell \u2014 all valid PowerShell is valid PASM. PASM adds assembler directives (dot-prefixed functions), a macro system, label syntax, and hex/binary literal shorthands.",
+  "fileExtensions": [
+    ".pasm",
+    ".i"
+  ],
+  "comments": {
+    "description": "PASM supports two comment styles",
+    "lineComment": "//",
+    "blockComment": {
+      "start": "/*",
+      "end": "*/"
+    },
+    "note": "The native PowerShell # comment is NOT used in PASM files to avoid ambiguity with preprocessor conventions. // disables a line; prefixing a .macro definition with // comments it out entirely."
+  },
+  "literals": {
+    "description": "PASM extends PowerShell with additional numeric literal prefixes",
+    "hex": {
+      "prefix": "$",
+      "examples": [
+        "$d021",
+        "$0801",
+        "$ff",
+        "$4000"
+      ],
+      "note": "$ is the PASM hex prefix. This overlaps with PowerShell variable sigil \u2014 context determines interpretation: $d021 with no following word chars is a hex literal; $myVar is a variable."
+    },
+    "binary": {
+      "prefix": "%",
+      "examples": [
+        "%10101010",
+        "%00000000",
+        "%11111111"
+      ]
+    },
+    "decimal": {
+      "description": "Standard PowerShell decimal integers and 0x-prefixed hex are also valid"
+    }
+  },
+  "labels": {
+    "description": "Labels mark addresses in the assembled output. A label on its own line consumes no bytes.",
+    "named": {
+      "syntax": "<identifier>:",
+      "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*:$",
+      "placement": "A label may appear on its own line, before a mnemonic, or between a mnemonic and its operand (to facilitate self-modifying code).",
+      "examples": [
+        "Start:",
+        "SpriteXMoveData:",
+        "zpTmp:",
+        "Flickerydo:"
+      ]
+    },
+    "anonymous": {
+      "definition": ":",
+      "description": "A bare colon with no preceding identifier defines an anonymous label.",
+      "references": {
+        ":+": "Next anonymous label forward",
+        ":++": "Two anonymous labels forward",
+        ":+++": "Three anonymous labels forward (pattern: additional + per label)",
+        ":-": "Previous anonymous label backward",
+        ":--": "Two anonymous labels backward",
+        ":---": "Three anonymous labels backward (pattern: additional - per label)",
+        "offsetSyntax": {
+          "description": "An offset can be added to any anonymous reference",
+          "syntax": ":<signs><+N> or :<signs><-N>",
+          "examples": [
+            ":---+1",
+            ":++\u22122"
+          ],
+          "note": "Offset is applied to the resolved label address, not the label index. Used to reference specific bytes within or near a label (e.g. the operand byte of an instruction for self-modifying code)."
+        }
+      }
+    }
+  },
+  "mnemonics": {
+    "description": "Standard 6502 mnemonics are written as bare identifiers (no dot prefix, no sigil). They are not PASM functions \u2014 they are passed through to the assembler engine. Mnemonics are case-insensitive in source but stored in uppercase in the opcode table.",
+    "note": "Illegal/undocumented opcodes are not included here. They may be supported via .inst with explicit opcode bytes.",
+    "addressingModeKeys": {
+      "description": "The PascalCase keys used in [MOS6502]::OpCodes and [MOS6502]::OperandSize. These are the valid values for the AddressingMode parameter of .inst.",
+      "modes": [
+        {
+          "key": "Implied",
+          "operandSizeBits": 0,
+          "syntax": "mnemonic",
+          "example": "nop",
+          "note": "Also used for Accumulator-mode instructions (ASL, LSR, ROL, ROR) \u2014 the accumulator is implicit."
+        },
+        {
+          "key": "Immediate",
+          "operandSizeBits": 8,
+          "syntax": "mnemonic #<value>",
+          "example": "lda #$40"
+        },
+        {
+          "key": "Absolute",
+          "operandSizeBits": 16,
+          "syntax": "mnemonic <addr>",
+          "example": "jmp $c000",
+          "note": "Auto-promoted to ZeroPage by .inst when operand < 256 and mnemonic supports ZeroPage."
+        },
+        {
+          "key": "AbsoluteIndexedX",
+          "operandSizeBits": 16,
+          "syntax": "mnemonic <addr>,x",
+          "example": "lda $d000,x",
+          "note": "Auto-promoted to ZeroPageIndexedX by .inst when operand < 256 and mnemonic supports it."
+        },
+        {
+          "key": "AbsoluteIndexedY",
+          "operandSizeBits": 16,
+          "syntax": "mnemonic <addr>,y",
+          "example": "lda $d000,y",
+          "note": "Auto-promoted to ZeroPageIndexedY by .inst when operand < 256 and mnemonic supports it."
+        },
+        {
+          "key": "ZeroPage",
+          "operandSizeBits": 8,
+          "syntax": "mnemonic <addr>",
+          "example": "sta $d021"
+        },
+        {
+          "key": "ZeroPageIndexedX",
+          "operandSizeBits": 8,
+          "syntax": "mnemonic <addr>,x",
+          "example": "sta $d000,x"
+        },
+        {
+          "key": "ZeroPageIndexedY",
+          "operandSizeBits": 8,
+          "syntax": "mnemonic <addr>,y",
+          "example": "ldx $00,y"
+        },
+        {
+          "key": "IndexedXIndirect",
+          "operandSizeBits": 8,
+          "syntax": "mnemonic (<addr>,x)",
+          "example": "lda ($40,x)"
+        },
+        {
+          "key": "IndirectIndexedY",
+          "operandSizeBits": 8,
+          "syntax": "mnemonic (<addr>),y",
+          "example": "lda ($40),y"
+        },
+        {
+          "key": "IndirectAbsolute",
+          "operandSizeBits": 16,
+          "syntax": "mnemonic (<addr>)",
+          "example": "jmp ($fffc)",
+          "note": "Only used by JMP. The 6502 page-boundary bug applies."
+        },
+        {
+          "key": "Relative",
+          "operandSizeBits": 8,
+          "syntax": "mnemonic <label>",
+          "example": "bne :--",
+          "note": "Branch instructions only. Pass the absolute target address to .inst \u2014 the runtime computes the signed relative offset automatically."
+        }
+      ]
+    },
+    "opcodeTable": {
+      "description": "Complete legal 6502 opcode table derived from [MOS6502]::OpCodes. Each entry lists valid addressing modes and their opcode bytes. Source of truth for extension completion and validation.",
+      "instructions": [
+        {
+          "mnemonic": "ADC",
+          "description": "Add with carry",
+          "modes": {
+            "Immediate": "0x69",
+            "Absolute": "0x6D",
+            "AbsoluteIndexedX": "0x7D",
+            "AbsoluteIndexedY": "0x79",
+            "ZeroPage": "0x65",
+            "ZeroPageIndexedX": "0x75",
+            "IndexedXIndirect": "0x61",
+            "IndirectIndexedY": "0x71"
+          }
+        },
+        {
+          "mnemonic": "AND",
+          "description": "Logical AND",
+          "modes": {
+            "Immediate": "0x29",
+            "Absolute": "0x2D",
+            "AbsoluteIndexedX": "0x3D",
+            "AbsoluteIndexedY": "0x39",
+            "ZeroPage": "0x25",
+            "ZeroPageIndexedX": "0x35",
+            "IndexedXIndirect": "0x21",
+            "IndirectIndexedY": "0x31"
+          }
+        },
+        {
+          "mnemonic": "ASL",
+          "description": "Arithmetic shift left",
+          "modes": {
+            "Implied": "0x0A",
+            "Absolute": "0x0E",
+            "AbsoluteIndexedX": "0x1E",
+            "ZeroPage": "0x06",
+            "ZeroPageIndexedX": "0x16"
+          }
+        },
+        {
+          "mnemonic": "BCC",
+          "description": "Branch if carry clear",
+          "modes": {
+            "Relative": "0x90"
+          }
+        },
+        {
+          "mnemonic": "BCS",
+          "description": "Branch if carry set",
+          "modes": {
+            "Relative": "0xB0"
+          }
+        },
+        {
+          "mnemonic": "BEQ",
+          "description": "Branch if equal (zero set)",
+          "modes": {
+            "Relative": "0xF0"
+          }
+        },
+        {
+          "mnemonic": "BIT",
+          "description": "Bit test",
+          "modes": {
+            "Absolute": "0x2C",
+            "ZeroPage": "0x24"
+          }
+        },
+        {
+          "mnemonic": "BMI",
+          "description": "Branch if minus (neg set)",
+          "modes": {
+            "Relative": "0x30"
+          }
+        },
+        {
+          "mnemonic": "BNE",
+          "description": "Branch if not equal",
+          "modes": {
+            "Relative": "0xD0"
+          }
+        },
+        {
+          "mnemonic": "BPL",
+          "description": "Branch if plus (neg clear)",
+          "modes": {
+            "Relative": "0x10"
+          }
+        },
+        {
+          "mnemonic": "BRK",
+          "description": "Force interrupt",
+          "modes": {
+            "Implied": "0x00"
+          }
+        },
+        {
+          "mnemonic": "BVC",
+          "description": "Branch if overflow clear",
+          "modes": {
+            "Relative": "0x50"
+          }
+        },
+        {
+          "mnemonic": "BVS",
+          "description": "Branch if overflow set",
+          "modes": {
+            "Relative": "0x70"
+          }
+        },
+        {
+          "mnemonic": "CLC",
+          "description": "Clear carry flag",
+          "modes": {
+            "Implied": "0x18"
+          }
+        },
+        {
+          "mnemonic": "CLD",
+          "description": "Clear decimal mode",
+          "modes": {
+            "Implied": "0xD8"
+          }
+        },
+        {
+          "mnemonic": "CLI",
+          "description": "Clear interrupt disable",
+          "modes": {
+            "Implied": "0x58"
+          }
+        },
+        {
+          "mnemonic": "CLV",
+          "description": "Clear overflow flag",
+          "modes": {
+            "Implied": "0xB8"
+          }
+        },
+        {
+          "mnemonic": "CMP",
+          "description": "Compare accumulator",
+          "modes": {
+            "Immediate": "0xC9",
+            "Absolute": "0xCD",
+            "AbsoluteIndexedX": "0xDD",
+            "AbsoluteIndexedY": "0xD9",
+            "ZeroPage": "0xC5",
+            "ZeroPageIndexedX": "0xD5",
+            "IndexedXIndirect": "0xC1",
+            "IndirectIndexedY": "0xD1"
+          }
+        },
+        {
+          "mnemonic": "CPX",
+          "description": "Compare X register",
+          "modes": {
+            "Immediate": "0xE0",
+            "Absolute": "0xEC",
+            "ZeroPage": "0xE4"
+          }
+        },
+        {
+          "mnemonic": "CPY",
+          "description": "Compare Y register",
+          "modes": {
+            "Immediate": "0xC0",
+            "Absolute": "0xCC",
+            "ZeroPage": "0xC4"
+          }
+        },
+        {
+          "mnemonic": "DEC",
+          "description": "Decrement memory",
+          "modes": {
+            "Absolute": "0xCE",
+            "AbsoluteIndexedX": "0xDE",
+            "ZeroPage": "0xC6",
+            "ZeroPageIndexedX": "0xD6"
+          }
+        },
+        {
+          "mnemonic": "DEX",
+          "description": "Decrement X register",
+          "modes": {
+            "Implied": "0xCA"
+          }
+        },
+        {
+          "mnemonic": "DEY",
+          "description": "Decrement Y register",
+          "modes": {
+            "Implied": "0x88"
+          }
+        },
+        {
+          "mnemonic": "EOR",
+          "description": "Exclusive OR",
+          "modes": {
+            "Immediate": "0x49",
+            "Absolute": "0x4D",
+            "AbsoluteIndexedX": "0x5D",
+            "AbsoluteIndexedY": "0x59",
+            "ZeroPage": "0x45",
+            "ZeroPageIndexedX": "0x55",
+            "IndexedXIndirect": "0x41",
+            "IndirectIndexedY": "0x51"
+          }
+        },
+        {
+          "mnemonic": "INC",
+          "description": "Increment memory",
+          "modes": {
+            "Absolute": "0xEE",
+            "AbsoluteIndexedX": "0xFE",
+            "ZeroPage": "0xE6",
+            "ZeroPageIndexedX": "0xF6"
+          }
+        },
+        {
+          "mnemonic": "INX",
+          "description": "Increment X register",
+          "modes": {
+            "Implied": "0xE8"
+          }
+        },
+        {
+          "mnemonic": "INY",
+          "description": "Increment Y register",
+          "modes": {
+            "Implied": "0xC8"
+          }
+        },
+        {
+          "mnemonic": "JMP",
+          "description": "Jump",
+          "modes": {
+            "Absolute": "0x4C",
+            "IndirectAbsolute": "0x6C"
+          }
+        },
+        {
+          "mnemonic": "JSR",
+          "description": "Jump to subroutine",
+          "modes": {
+            "Absolute": "0x20"
+          }
+        },
+        {
+          "mnemonic": "LDA",
+          "description": "Load accumulator",
+          "modes": {
+            "Immediate": "0xA9",
+            "Absolute": "0xAD",
+            "AbsoluteIndexedX": "0xBD",
+            "AbsoluteIndexedY": "0xB9",
+            "ZeroPage": "0xA5",
+            "ZeroPageIndexedX": "0xB5",
+            "IndexedXIndirect": "0xA1",
+            "IndirectIndexedY": "0xB1"
+          }
+        },
+        {
+          "mnemonic": "LDX",
+          "description": "Load X register",
+          "modes": {
+            "Immediate": "0xA2",
+            "Absolute": "0xAE",
+            "AbsoluteIndexedY": "0xBE",
+            "ZeroPage": "0xA6",
+            "ZeroPageIndexedY": "0xB6"
+          }
+        },
+        {
+          "mnemonic": "LDY",
+          "description": "Load Y register",
+          "modes": {
+            "Immediate": "0xA0",
+            "Absolute": "0xAC",
+            "AbsoluteIndexedX": "0xBC",
+            "ZeroPage": "0xA4",
+            "ZeroPageIndexedX": "0xB4"
+          }
+        },
+        {
+          "mnemonic": "LSR",
+          "description": "Logical shift right",
+          "modes": {
+            "Implied": "0x4A",
+            "Absolute": "0x4E",
+            "AbsoluteIndexedX": "0x5E",
+            "ZeroPage": "0x46",
+            "ZeroPageIndexedX": "0x56"
+          }
+        },
+        {
+          "mnemonic": "NOP",
+          "description": "No operation",
+          "modes": {
+            "Implied": "0xEA"
+          }
+        },
+        {
+          "mnemonic": "ORA",
+          "description": "Logical OR with accumulator",
+          "modes": {
+            "Immediate": "0x09",
+            "Absolute": "0x0D",
+            "AbsoluteIndexedX": "0x1D",
+            "AbsoluteIndexedY": "0x19",
+            "ZeroPage": "0x05",
+            "ZeroPageIndexedX": "0x15",
+            "IndexedXIndirect": "0x01",
+            "IndirectIndexedY": "0x11"
+          }
+        },
+        {
+          "mnemonic": "PHA",
+          "description": "Push accumulator",
+          "modes": {
+            "Implied": "0x48"
+          }
+        },
+        {
+          "mnemonic": "PHP",
+          "description": "Push processor status",
+          "modes": {
+            "Implied": "0x08"
+          }
+        },
+        {
+          "mnemonic": "PLA",
+          "description": "Pull accumulator",
+          "modes": {
+            "Implied": "0x68"
+          }
+        },
+        {
+          "mnemonic": "PLP",
+          "description": "Pull processor status",
+          "modes": {
+            "Implied": "0x28"
+          }
+        },
+        {
+          "mnemonic": "ROL",
+          "description": "Rotate left",
+          "modes": {
+            "Implied": "0x2A",
+            "Absolute": "0x2E",
+            "AbsoluteIndexedX": "0x3E",
+            "ZeroPage": "0x26",
+            "ZeroPageIndexedX": "0x36"
+          }
+        },
+        {
+          "mnemonic": "ROR",
+          "description": "Rotate right",
+          "modes": {
+            "Implied": "0x6A",
+            "Absolute": "0x6E",
+            "AbsoluteIndexedX": "0x7E",
+            "ZeroPage": "0x66",
+            "ZeroPageIndexedX": "0x76"
+          }
+        },
+        {
+          "mnemonic": "RTI",
+          "description": "Return from interrupt",
+          "modes": {
+            "Implied": "0x40"
+          }
+        },
+        {
+          "mnemonic": "RTS",
+          "description": "Return from subroutine",
+          "modes": {
+            "Implied": "0x60"
+          }
+        },
+        {
+          "mnemonic": "SBC",
+          "description": "Subtract with carry",
+          "modes": {
+            "Immediate": "0xE9",
+            "Absolute": "0xED",
+            "AbsoluteIndexedX": "0xFD",
+            "AbsoluteIndexedY": "0xF9",
+            "ZeroPage": "0xE5",
+            "ZeroPageIndexedX": "0xF5",
+            "IndexedXIndirect": "0xE1",
+            "IndirectIndexedY": "0xF1"
+          }
+        },
+        {
+          "mnemonic": "SEC",
+          "description": "Set carry flag",
+          "modes": {
+            "Implied": "0x38"
+          }
+        },
+        {
+          "mnemonic": "SED",
+          "description": "Set decimal flag",
+          "modes": {
+            "Implied": "0xF8"
+          }
+        },
+        {
+          "mnemonic": "SEI",
+          "description": "Set interrupt disable",
+          "modes": {
+            "Implied": "0x78"
+          }
+        },
+        {
+          "mnemonic": "STA",
+          "description": "Store accumulator",
+          "modes": {
+            "Absolute": "0x8D",
+            "AbsoluteIndexedX": "0x9D",
+            "AbsoluteIndexedY": "0x99",
+            "ZeroPage": "0x85",
+            "ZeroPageIndexedX": "0x95",
+            "IndexedXIndirect": "0x81",
+            "IndirectIndexedY": "0x91"
+          }
+        },
+        {
+          "mnemonic": "STX",
+          "description": "Store X register",
+          "modes": {
+            "Absolute": "0x8E",
+            "ZeroPage": "0x86",
+            "ZeroPageIndexedY": "0x96"
+          }
+        },
+        {
+          "mnemonic": "STY",
+          "description": "Store Y register",
+          "modes": {
+            "Absolute": "0x8C",
+            "ZeroPage": "0x84",
+            "ZeroPageIndexedX": "0x94"
+          }
+        },
+        {
+          "mnemonic": "TAX",
+          "description": "Transfer A to X",
+          "modes": {
+            "Implied": "0xAA"
+          }
+        },
+        {
+          "mnemonic": "TAY",
+          "description": "Transfer A to Y",
+          "modes": {
+            "Implied": "0xA8"
+          }
+        },
+        {
+          "mnemonic": "TSX",
+          "description": "Transfer stack ptr to X",
+          "modes": {
+            "Implied": "0xBA"
+          }
+        },
+        {
+          "mnemonic": "TXA",
+          "description": "Transfer X to A",
+          "modes": {
+            "Implied": "0x8A"
+          }
+        },
+        {
+          "mnemonic": "TXS",
+          "description": "Transfer X to stack ptr",
+          "modes": {
+            "Implied": "0x9A"
+          }
+        },
+        {
+          "mnemonic": "TYA",
+          "description": "Transfer Y to A",
+          "modes": {
+            "Implied": "0x98"
+          }
+        }
+      ]
+    },
+    "operandExpressions": {
+      "loByte": {
+        "syntax": "<$value",
+        "aliases": [
+          ".lo",
+          "_loByte"
+        ],
+        "description": "Low byte of a 16-bit value. The < prefix is syntactic sugar for _loByte()."
+      },
+      "hiByte": {
+        "syntax": ">$value",
+        "aliases": [
+          ".hi",
+          "_hiByte"
+        ],
+        "description": "High byte of a 16-bit value. The > prefix is syntactic sugar for _hiByte()."
+      },
+      "note": "Any PowerShell expression is valid as an operand value. Label references and anonymous label references are also valid operand values and are resolved across assembler passes."
+    }
+  },
+  "directives": {
+    "description": "Directives are PowerShell functions exposed by the PASM module. They are invoked using PowerShell call syntax (space-separated named parameters). All directives are marked with the [PASM()] attribute internally.",
+    "internalParameters": {
+      "description": "The following parameters are injected automatically by the PASM runtime and must NOT be offered as completions or shown in hover docs.",
+      "parameters": [
+        "InvocationFile",
+        "InvocationLine"
+      ]
+    },
+    "items": [
+      {
+        "name": ".byte",
+        "aliases": [
+          "dc.b"
+        ],
+        "description": "Emits one or more bytes into the assembled output. Values must be in range -128..255.",
+        "parameters": [
+          {
+            "name": "values",
+            "type": "int[]",
+            "mandatory": true,
+            "positional": 0,
+            "description": "One or more byte values. Negative values in -128..-1 are treated as signed and converted to their unsigned equivalents."
+          }
+        ],
+        "examples": [
+          ".byte $ea",
+          ".byte 0, 1, 2, 3",
+          ".byte %10101010, %01010101",
+          ".byte ($i -band 4 ? $col1 : $col0)"
+        ]
+      },
+      {
+        "name": ".word",
+        "aliases": [
+          "dc.w"
+        ],
+        "description": "Emits one or more 16-bit little-endian words into the assembled output. Values must be in range -32768..65535.",
+        "parameters": [
+          {
+            "name": "values",
+            "type": "int[]",
+            "mandatory": true,
+            "positional": 0,
+            "description": "One or more word values."
+          }
+        ],
+        "examples": [
+          ".word $0801",
+          ".word :+, $BasicLineNumber"
+        ]
+      },
+      {
+        "name": ".text",
+        "aliases": [
+          ".txt",
+          ".petscii",
+          ".ascii"
+        ],
+        "description": "Emits string or character data as bytes. Alias .petscii forces PETSCII encoding (swaps case). Alias .ascii forces ASCII encoding.",
+        "parameters": [
+          {
+            "name": "text",
+            "type": "object",
+            "mandatory": true,
+            "positional": 0,
+            "description": "String, char array, or byte array to emit."
+          },
+          {
+            "name": "AsPETSCII",
+            "type": "switch",
+            "mandatory": false,
+            "description": "Convert to PETSCII encoding (uppercase/lowercase swap). Implied when invoked as .petscii."
+          }
+        ],
+        "examples": [
+          ".text \"Hello, World!\"",
+          ".text $9e, ($Address)?.ToString(), 0",
+          ".petscii \"GAME OVER\""
+        ]
+      },
+      {
+        "name": ".align",
+        "aliases": [],
+        "description": "Advances the program counter to the next multiple of the given boundary, optionally filling the gap.",
+        "parameters": [
+          {
+            "name": "boundary",
+            "type": "int",
+            "mandatory": true,
+            "positional": 0,
+            "description": "Byte boundary to align to (e.g. 256 for page alignment)."
+          },
+          {
+            "name": "fill",
+            "type": "byte",
+            "mandatory": false,
+            "positional": 1,
+            "description": "Byte value to fill the gap with. Default is $ea (NOP)."
+          }
+        ],
+        "examples": [
+          ".align 256",
+          ".align 256 $ea"
+        ]
+      },
+      {
+        "name": ".fill",
+        "aliases": [],
+        "description": "Emits a repeated byte value N times.",
+        "parameters": [
+          {
+            "name": "count",
+            "type": "int",
+            "mandatory": true,
+            "positional": 0,
+            "description": "Number of bytes to emit."
+          },
+          {
+            "name": "value",
+            "type": "byte",
+            "mandatory": false,
+            "positional": 1,
+            "description": "Byte value to repeat. Default 0."
+          }
+        ],
+        "examples": [
+          ".fill 64",
+          ".fill 64 $ff"
+        ]
+      },
+      {
+        "name": ".org",
+        "aliases": [
+          ".pc"
+        ],
+        "description": "Sets the assembler program counter to an absolute address, without emitting any bytes.",
+        "parameters": [
+          {
+            "name": "address",
+            "type": "int",
+            "mandatory": true,
+            "positional": 0,
+            "description": "Target address."
+          }
+        ],
+        "examples": [
+          ".org $0801",
+          ".org $c000"
+        ]
+      },
+      {
+        "name": ".segment",
+        "aliases": [],
+        "description": "Defines and activates a named memory segment. Segments control where assembled bytes are placed in the output.",
+        "parameters": [
+          {
+            "name": "name",
+            "type": "string",
+            "mandatory": true,
+            "positional": 0,
+            "description": "Unique segment name."
+          },
+          {
+            "name": "Start",
+            "type": "int",
+            "mandatory": false,
+            "description": "Absolute start address of the segment."
+          },
+          {
+            "name": "StartAfter",
+            "type": "string",
+            "mandatory": false,
+            "description": "Name of another segment; this segment starts immediately after it."
+          },
+          {
+            "name": "End",
+            "type": "int",
+            "mandatory": false,
+            "description": "Absolute end address (exclusive)."
+          },
+          {
+            "name": "Size",
+            "type": "int",
+            "mandatory": false,
+            "description": "Size in bytes. Alternative to End."
+          },
+          {
+            "name": "Run",
+            "type": "int",
+            "mandatory": false,
+            "description": "Runtime address if different from load address (for relocated segments)."
+          },
+          {
+            "name": "Align",
+            "type": "int",
+            "mandatory": false,
+            "description": "Align segment start to this byte boundary."
+          },
+          {
+            "name": "Fill",
+            "type": "switch",
+            "mandatory": false,
+            "description": "Fill unused space in segment with FillBytes."
+          },
+          {
+            "name": "FillBytes",
+            "type": "byte[]",
+            "mandatory": false,
+            "description": "Byte pattern to use when filling. Default [0]."
+          },
+          {
+            "name": "AllowOverlap",
+            "type": "switch",
+            "mandatory": false,
+            "description": "Suppress errors if segment overlaps another."
+          },
+          {
+            "name": "Virtual",
+            "type": "switch",
+            "mandatory": false,
+            "description": "Segment exists only in the assembler's address space; not written to output."
+          }
+        ],
+        "examples": [
+          ".segment BASIC -Start $0801",
+          ".segment code -StartAfter BASIC",
+          ".segment zp -Start 2 -End 255 -Virtual"
+        ]
+      },
+      {
+        "name": ".pushsegment",
+        "aliases": [],
+        "description": "Pushes a new named segment onto the segment stack, activating it. Use .popsegment to return to the previous segment. Accepts the same parameters as .segment.",
+        "parameters": [
+          {
+            "name": "name",
+            "type": "string",
+            "mandatory": true,
+            "positional": 0
+          },
+          {
+            "name": "Start",
+            "type": "int",
+            "mandatory": false
+          },
+          {
+            "name": "StartAfter",
+            "type": "string",
+            "mandatory": false
+          },
+          {
+            "name": "End",
+            "type": "int",
+            "mandatory": false
+          },
+          {
+            "name": "Size",
+            "type": "int",
+            "mandatory": false
+          },
+          {
+            "name": "Run",
+            "type": "int",
+            "mandatory": false
+          },
+          {
+            "name": "Align",
+            "type": "int",
+            "mandatory": false
+          },
+          {
+            "name": "Fill",
+            "type": "switch",
+            "mandatory": false
+          },
+          {
+            "name": "FillBytes",
+            "type": "byte[]",
+            "mandatory": false
+          },
+          {
+            "name": "AllowOverlap",
+            "type": "switch",
+            "mandatory": false
+          },
+          {
+            "name": "Virtual",
+            "type": "switch",
+            "mandatory": false
+          }
+        ],
+        "examples": [
+          ".pushsegment \"ESCOS_SpriteData\" -Start ($baseAddress + $this.spriteDataAddress) -Size ($this.spriteDataAddress + $this.spriteData.length)"
+        ]
+      },
+      {
+        "name": ".popsegment",
+        "aliases": [],
+        "description": "Pops the current segment from the segment stack, restoring the previous segment.",
+        "parameters": [],
+        "examples": [
+          ".popsegment"
+        ]
+      },
+      {
+        "name": ".include",
+        "aliases": [],
+        "description": "Includes and assembles another PASM file at the current location. The included file shares the current scope.",
+        "parameters": [
+          {
+            "name": "path",
+            "type": "string",
+            "mandatory": true,
+            "positional": 0,
+            "description": "Relative or absolute path to the .pasm or .i file."
+          }
+        ],
+        "examples": [
+          ".include \".\\lib\\MyMacros.i\""
+        ]
+      },
+      {
+        "name": ".includeonce",
+        "aliases": [],
+        "description": "Like .include, but the file is only assembled the first time it is referenced. Subsequent includes of the same file are silently ignored (include guard behaviour).",
+        "parameters": [
+          {
+            "name": "path",
+            "type": "string",
+            "mandatory": true,
+            "positional": 0
+          }
+        ],
+        "examples": [
+          ".includeonce \".\\lib\\common.i\""
+        ]
+      },
+      {
+        "name": ".macro",
+        "aliases": [
+          ".mac"
+        ],
+        "description": "Defines a reusable named macro. See macroSyntax section for full grammar.",
+        "parameters": [
+          {
+            "name": "name",
+            "type": "string",
+            "mandatory": true,
+            "positional": 0,
+            "description": "Macro name. May include a dot prefix (e.g. .assert)."
+          },
+          {
+            "name": "params",
+            "type": "string[]",
+            "mandatory": false,
+            "positional": 1,
+            "description": "Comma-separated parameter list in parentheses, optionally with default values."
+          },
+          {
+            "name": "body",
+            "type": "scriptblock",
+            "mandatory": true,
+            "positional": 2,
+            "description": "The macro body as a PowerShell script block { ... }."
+          }
+        ],
+        "examples": [
+          ".macro .break { breakpoint: }",
+          ".macro SetSpritePtrs($spriteDataAddress, $screenMemoryAddress) { ... }",
+          ".macro BasicPrgHeader($Address=$null, $BasicLineNumber=(Get-Date).Year) { ... }"
+        ]
+      },
+      {
+        "name": ".repeat",
+        "aliases": [
+          ".rep"
+        ],
+        "description": "Repeats the body script block a fixed number of times.",
+        "parameters": [
+          {
+            "name": "count",
+            "type": "int",
+            "mandatory": true,
+            "positional": 0,
+            "description": "Number of repetitions."
+          },
+          {
+            "name": "body",
+            "type": "scriptblock",
+            "mandatory": true,
+            "positional": 1,
+            "description": "Block to repeat."
+          }
+        ],
+        "examples": [
+          ".repeat 8 { .byte 0 }",
+          ".repeat 17 { .byte %10101010,%10101010,%10101010 }"
+        ]
+      },
+      {
+        "name": ".label",
+        "aliases": [
+          ".lab"
+        ],
+        "description": "Defines a named label programmatically (equivalent to writing Name: in source). Useful when generating label names dynamically.",
+        "parameters": [
+          {
+            "name": "name",
+            "type": "string",
+            "mandatory": true,
+            "positional": 0
+          }
+        ],
+        "examples": [
+          ".label \"DynamicLabel\""
+        ]
+      },
+      {
+        "name": ".inst",
+        "aliases": [],
+        "description": "Emits a 6502 instruction programmatically by specifying mnemonic, addressing mode, and operand as values. Used when the mnemonic or addressing mode must be computed at script time rather than written literally. The runtime will automatically promote Absolute to ZeroPage (and AbsoluteIndexedX/Y to their ZeroPage equivalents) when the operand value is less than 256 and the mnemonic supports the zero-page form.",
+        "parameters": [
+          {
+            "name": "Mnemonic",
+            "aliases": [
+              "mn"
+            ],
+            "type": "string",
+            "mandatory": true,
+            "description": "6502 mnemonic string (e.g. 'lda', 'sta', 'jmp'). Must be a key in the MOS6502 opcode table."
+          },
+          {
+            "name": "AddressingMode",
+            "aliases": [
+              "am"
+            ],
+            "type": "string",
+            "mandatory": true,
+            "description": "Addressing mode string. Must be valid for the given mnemonic. See addressingModeKeys for the controlled vocabulary.",
+            "validValues": [
+              "Implied",
+              "Accumulator",
+              "Immediate",
+              "ZeroPage",
+              "ZeroPageIndexedX",
+              "ZeroPageIndexedY",
+              "Absolute",
+              "AbsoluteIndexedX",
+              "AbsoluteIndexedY",
+              "Indirect",
+              "IndexedIndirectX",
+              "IndirectIndexedY",
+              "Relative"
+            ],
+            "autoPromotion": {
+              "description": "When Operand < 256, the runtime will silently promote to the zero-page equivalent if available for the mnemonic.",
+              "promotions": {
+                "Absolute": "ZeroPage",
+                "AbsoluteIndexedX": "ZeroPageIndexedX",
+                "AbsoluteIndexedY": "ZeroPageIndexedY"
+              }
+            }
+          },
+          {
+            "name": "Operand",
+            "aliases": [
+              "op"
+            ],
+            "type": "object",
+            "mandatory": false,
+            "description": "The instruction operand. For Implied/Accumulator modes, omit entirely. For Relative mode the runtime computes the signed relative offset automatically from the absolute target address \u2014 pass the target address, not a pre-calculated offset."
+          }
+        ],
+        "examples": [
+          ".inst 'lda' 'Immediate' $40",
+          ".inst -mn 'sta' -am 'Absolute' -op $d021",
+          ".inst 'jmp' 'Absolute' $c000",
+          ".inst 'nop' 'Implied'"
+        ]
+      }
+    ]
+  },
+  "macroSyntax": {
+    "description": "Rules for defining and invoking user macros. Macros are a core PASM language feature built on top of PowerShell script blocks.",
+    "definition": {
+      "syntax": ".macro <name>(<params>) { <body> }",
+      "rules": [
+        "Macro names follow the same identifier rules as labels, but may include a leading dot (e.g. .assert, .break).",
+        "Parameters are declared as $name, with optional default values: $name=<defaultExpr>.",
+        "Default values are PowerShell expressions evaluated at definition time.",
+        "Known PowerShell parser limitation: only one parameter may have a 'complex' default expression (e.g. a method call like (Get-Date).Year). If multiple complex defaults are needed, declare them as $null and resolve inside the body with: if ($null -eq $Param) { $Param = <expr> }",
+        "Macros must be defined before their first invocation (forward references are not supported).",
+        "A macro definition prefixed with // is treated as commented out and not registered.",
+        "Macros are globally scoped within the assembler session."
+      ],
+      "examples": [
+        ".macro .break { breakpoint: }",
+        ".macro SetSpritePtrs($spriteDataAddress, $screenMemoryAddress) { ... }",
+        ".macro BasicPrgHeader($Address=$null, $BasicLineNumber=(Get-Date).Year) {\n    if ($null -eq $Address) { $Address = :++ }\n    ...\n}"
+      ]
+    },
+    "invocation": {
+      "syntax": "<macroName> <arg1> <arg2>  or  <macroName>(<arg1>, <arg2>)",
+      "rules": [
+        "Macros are invoked exactly like PowerShell functions: space-separated positional args, or named -ParamName value style.",
+        "Parenthesised call syntax is also valid for compatibility.",
+        "Arguments may be any PowerShell expression.",
+        "Macros defined in .i files via .include are available after the include line."
+      ],
+      "examples": [
+        "SetSpritePtrs($this.spriteDataAddress, $screenMemoryAddress)",
+        "BasicPrgHeader()",
+        "BasicPrgHeader $myAddress 2024"
+      ]
+    }
+  },
+  "classes": {
+    "description": "PASM supports PowerShell class definitions (class keyword) as first-class language constructs. Classes are used to encapsulate related state and behaviour (e.g. the ESCOS sprite scroller class).",
+    "rules": [
+      "Standard PowerShell class syntax is used verbatim.",
+      "Class methods may contain any mix of PowerShell and PASM assembler directives and mnemonics.",
+      "Class instantiation uses standard PowerShell: [ClassName]::new(...) or [ClassName]::new().",
+      "The hidden keyword is supported for private fields.",
+      "Multiple constructors are supported."
+    ],
+    "note": "The PASM runtime assembles any directives/mnemonics found inside method bodies during the method call, using the current assembler PC at the time of the call."
+  },
+  "passThroughPowerShell": {
+    "description": "All PowerShell language constructs are valid in PASM files. The following are commonly used and should receive full syntax highlighting and IntelliSense from the extension, identical to a .ps1 file.",
+    "constructs": [
+      "Variables ($name, $this, $env:...)",
+      "Pipelines (|) and foreach loops",
+      "Comparison operators (-eq, -ne, -lt, -gt, -le, -ge, -band, -bor, -bxor, -shl, -shr, -not)",
+      "String interpolation (\"...\")",
+      "Script blocks ({ ... })",
+      "Ternary operator (condition ? trueVal : falseVal)",
+      "Range operator (..)",
+      "Type casting ([int], [byte], [Math]::Round(...))",
+      "PowerShell class definitions (class { })",
+      "Switch statements",
+      "Try/catch",
+      "If/elseif/else"
+    ]
+  },
+  "runtimeContext": {
+    "description": "Variables and objects provided by the PASM runtime, available throughout execution.",
+    "variables": [
+      {
+        "name": "$pasm",
+        "type": "object",
+        "description": "The PASM assembler context object. Available in all directive implementations, macro bodies, and class methods.",
+        "members": [
+          {
+            "name": "CurrentPass",
+            "type": "int",
+            "description": "Current assembler pass number (1-based). Most code executes on pass 1 and pass 2. Use to guard side-effects that should only fire on the final pass \u2014 e.g. assertions, output, error checking."
+          },
+          {
+            "name": "Segments",
+            "type": "object",
+            "description": "Segment manager.",
+            "members": [
+              {
+                "name": "Current",
+                "type": "object",
+                "description": "The currently active segment.",
+                "members": [
+                  {
+                    "name": "PC",
+                    "type": "int",
+                    "description": "Current program counter within this segment. Read-only from user code. Used by .inst for relative branch offset calculation."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "DataAdd",
+            "type": "method",
+            "signature": "DataAdd(byte[] data, string invocationFile, int invocationLine)",
+            "description": "Appends raw bytes to the current segment at the current PC. Used internally by .byte, .word, .text etc. Available for advanced directive/macro authors."
+          },
+          {
+            "name": "OpAdd",
+            "type": "method",
+            "signature": "OpAdd(byte opcode, object operand, string invocationFile, int invocationLine)  -or-  OpAdd(byte opcode, string invocationFile, int invocationLine)",
+            "description": "Emits a single opcode byte followed by its operand (1 or 2 bytes depending on addressing mode operand size). The implied/accumulator form omits the operand argument. Used internally by .inst."
+          }
+        ]
+      },
+      {
+        "name": "[MOS6502]",
+        "type": "class",
+        "description": "Static class exposing the 6502 opcode and operand-size tables. Available as a PowerShell type accelerator.",
+        "members": [
+          {
+            "name": "OpCodes",
+            "type": "hashtable",
+            "description": "Nested hashtable: [MOS6502]::OpCodes.<Mnemonic>.<AddressingMode> \u2192 opcode byte. Used by .inst to validate and resolve opcodes."
+          },
+          {
+            "name": "OperandSize",
+            "type": "hashtable",
+            "description": "Hashtable: [MOS6502]::OperandSize.<AddressingMode> \u2192 0, 8, or 16. 0 = implied (no operand), 8 = one byte operand, 16 = two byte operand."
+          }
+        ]
+      }
+    ]
+  },
+  "extensionGuidance": {
+    "description": "Guidance for the VS Code extension on how to consume this dialect spec.",
+    "highlighting": {
+      "directives": "All names in directives[].name and directives[].aliases should be highlighted as keywords.",
+      "mnemonics": "Standard 6502 mnemonics should be highlighted as a separate token type (e.g. assembler.mnemonic).",
+      "hexLiterals": "Tokens matching \\$[0-9a-fA-F]+ should be highlighted as numeric literals.",
+      "binaryLiterals": "Tokens matching %[01]+ should be highlighted as numeric literals.",
+      "labels": "Tokens matching ^[a-zA-Z_][a-zA-Z0-9_]*: should be highlighted as label definitions.",
+      "anonymousLabels": "Bare : on a line, and references :+, :-, :++, :--, etc. should be highlighted as label tokens.",
+      "comments": "// to end of line. /* ... */ blocks.",
+      "macroDefinitions": ".macro keyword followed by name and parameter list.",
+      "internalParams": "Parameters listed in directives.internalParameters must not appear in completion lists."
+    },
+    "completions": {
+      "directives": "Offer directive names with their non-internal parameters as snippet completions.",
+      "mnemonics": "Offer 6502 mnemonic completions with addressing mode placeholders.",
+      "macros": "Macros defined in the current file and any .included files should be offered as completions after definition point."
+    },
+    "compatibilityField": "dialectVersion",
+    "versionCheck": "The extension should expose its dialectVersion in package.json under contributes.pasmDialectVersion. A mismatch with the module's reported $script:DialectVersion should surface a warning to the user."
+  },
+  "aliases": [
+    {
+      "alias": ".ascii",
+      "target": ".text",
+      "note": "Forces ASCII encoding regardless of invocation context."
+    },
+    {
+      "alias": ".hi",
+      "target": "_hiByte",
+      "note": "High byte extraction operator."
+    },
+    {
+      "alias": ".lab",
+      "target": ".label",
+      "note": "Short form of .label."
+    },
+    {
+      "alias": ".lo",
+      "target": "_loByte",
+      "note": "Low byte extraction operator."
+    },
+    {
+      "alias": ".mac",
+      "target": ".macro",
+      "note": "Short form of .macro."
+    },
+    {
+      "alias": ".petscii",
+      "target": ".text",
+      "note": "Forces PETSCII encoding."
+    },
+    {
+      "alias": ".rep",
+      "target": ".repeat",
+      "note": "Short form of .repeat."
+    },
+    {
+      "alias": ".txt",
+      "target": ".text",
+      "note": "Neutral alias for .text."
+    },
+    {
+      "alias": "dc.b",
+      "target": ".byte",
+      "note": "CBM/Motorola assembler compatibility."
+    },
+    {
+      "alias": "dc.w",
+      "target": ".word",
+      "note": "CBM/Motorola assembler compatibility."
+    }
+  ]
+}
