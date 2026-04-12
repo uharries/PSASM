@@ -102,7 +102,7 @@ function Invoke-Assembler {
 	BEGIN {
 		$ErrorActionPreference = 'Stop'
 		function Print-Banner {
-			$vTag = format-string -Text "Version: $($script:ModuleVersion)" -Format Center -OutputStringWidth 21
+			$vTag = format-string -Text "Version $($script:ModuleFullVersion)" -Format Center -OutputStringWidth 21
 			Write-Host "                                                      "
 			Write-Host '        _/_/_/      _/_/      _/_/_/  _/      _/      '
 			Write-Host '       _/    _/  _/    _/  _/        _/_/  _/_/       '

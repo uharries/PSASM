@@ -3,6 +3,12 @@ Get-ChildItem -Path "$PSScriptRoot\Globals\*.ps1" -ErrorAction Ignore | ForEach-
 	. $_.FullName
 }
 
+$versionInfoPath = Join-Path $PSScriptRoot 'globals/VersionInfo.ps1'
+if (-not (Test-Path $versionInfoPath)) {
+    $script:ModuleVersion   = 'unknown'
+    $script:ModuleBuildDate = 'not built'
+}
+
 # --- Load Enums ---
 Get-ChildItem -Path "$PSScriptRoot\Enums\*.ps1" -ErrorAction Ignore | ForEach-Object {
 	. $_.FullName
