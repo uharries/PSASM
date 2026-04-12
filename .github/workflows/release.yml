@@ -72,9 +72,10 @@ jobs:
 
           "tag=$tag"                                               >> $env:GITHUB_OUTPUT
           "version=$version"                                       >> $env:GITHUB_OUTPUT
-          "is_prerelease=$($isPreRelease.ToString().ToLower())"   >> $env:GITHUB_OUTPUT
+          "full_version=$bare"                                     >> $env:GITHUB_OUTPUT
+          "is_prerelease=$($isPreRelease.ToString().ToLower())"    >> $env:GITHUB_OUTPUT
           "pre_label=$preLabel"                                    >> $env:GITHUB_OUTPUT
-          "psgallery_label=$psGalleryLabel"                       >> $env:GITHUB_OUTPUT
+          "psgallery_label=$psGalleryLabel"                        >> $env:GITHUB_OUTPUT
 
       # ── 3. Install dependencies ────────────────────────────────────────────
       - name: Install required modules
@@ -218,7 +219,7 @@ jobs:
         id: zip
         shell: pwsh
         run: |
-          $version    = '${{ steps.tag.outputs.version }}'
+          $version    = '${{ steps.tag.outputs.full_version }}'
           $zipName    = "PASM-$version.zip"
           $zipPath    = "./build/$zipName"
 
@@ -246,11 +247,11 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name:   ${{ steps.tag.outputs.tag }}
-          name:       PASM ${{ steps.tag.outputs.version }}
+          name:       ${{ steps.tag.outputs.tag }} Release of PASM
           prerelease: ${{ steps.tag.outputs.is_prerelease }}
           files:      ${{ steps.zip.outputs.zip_path }}
           body: |
-            ## PASM ${{ steps.tag.outputs.version }}
+            ## PASM ${{ steps.tag.outputs.tag }}
 
             **Build date:** ${{ steps.version.outputs.build_date }}
             **Tests:** ${{ steps.pester.outputs.tests_passed }} passed / ${{ steps.pester.outputs.tests_failed }} failed / ${{ steps.pester.outputs.tests_total }} total
@@ -265,7 +266,7 @@ jobs:
             ```
 
             ### Install from this release
-            Download `PASM-${{ steps.tag.outputs.version }}.zip`, extract, then:
+            Download `PASM-${{ steps.tag.outputs.full_version }}.zip`, extract, then:
             ```powershell
             Import-Module .\PASM\PASM.psm1
             ```
