@@ -2,20 +2,6 @@
 ** C style block comment with anonymous label reference for max confusion :++
 */
 
-.macro .repeat {
-	[Alias('.rep')]
-	param ([int]$count,[scriptblock]$data)
-	for($i=0;$i -lt $count;$i++){
-		$data.Invoke()
-	}
-}
-
-
-.macro .fill {
-	param ([ValidateRange(1,[int]::MaxValue)][int]$count,[scriptblock]$data)
-	.byte (0..($count-1) | ForEach-Object $data)
-}
-
 .macro Wait([ValidateRange(2,128kb)][int]$num) {
 	if ($num%2 -eq 0) {
 		.rep ($num/2) {nop;}
@@ -26,8 +12,6 @@
 		}
 	}
 }
-
-
 
 .macro WaitScanline($line) {
 	lda	#<($line)
@@ -49,21 +33,23 @@
 # 	beq	$addr
 # }
 
-.macro BasicPrgHeader($Address=:++, $BasicLineNumber=(Get-Date).Year) {
+.macro BasicPrgHeader($Address=$null, $BasicLineNumber=(Get-Date).Year) {
+	if ($null -eq $Address) { $Address = :++ }
 	.pc $0801
 	.word	:+, 1				// Link to next BASIC Line
-	.text	$9e, ($Address).ToString(), 0	// SYS, Textual representation of addr, end of BASIC line
+	.text	$9e, ($Address)?.ToString(), 0	// SYS, Textual representation of addr, end of BASIC line
 :	.word	0				// BASIC end marker
 :
 }
 
-.macro BasicPrgHeader2($addr=Next+2, $txt="") {
+.macro BasicPrgHeader2($addr=$null, $txt="") {
+	if ($null -eq $addr) { $addr = Next + 2 }
 	.pc $0801
 Head:
 	.word	Next				// Link to next BASIC Line
 	.word	1				// Line number
 	.byte	$9E				// SYS
-	.text	($addr).ToString()		// Textual representation of addr
+	.text	($addr)?.ToString()		// Textual representation of addr
 	.byte	10				// End of line, making BASIC execute the SYS and ignore the rest
 	.fill	10 {20}				// backspace 10 times to delete the display of the SYS call
 	.ascii	$txt				// ..well it gives a syntax error upon return, but that will never happen in a demo

@@ -3,11 +3,13 @@ class ScopeManager {
 	[System.Collections.Generic.Stack[int]]$scopeStack
 	[System.Collections.Generic.List[object]]$scopes
 
+
 	ScopeManager() {
 		$this.scopeStack = [System.Collections.Generic.Stack[int]]::new()
 		$this.scopes = [System.Collections.Generic.List[Scope]]::new()
 		$this.EnterNewScope(0,1,1)
 	}
+
 
 	[void] EnterNewScope([string]$name, [int]$startIndex, [int]$line, [int]$column) {
 		$scope = [Scope]::new()
@@ -21,9 +23,11 @@ class ScopeManager {
 		$this.scopeStack.Push($scope.Id)
 	}
 
+
 	[void] EnterNewScope([int]$startIndex, [int]$line, [int]$column) {
 		$this.EnterNewScope("", $startIndex, $line, $column)
 	}
+
 
 	[void] ExitNewScope([int]$endIndex, [int]$line, [int]$column) {
 		$id = $this.scopeStack.Pop()
@@ -36,22 +40,27 @@ class ScopeManager {
 		}
 	}
 
+
 	[void] EnterScope([int]$startIndex) {
 		$scope = $this.scopes | Where-Object { $_.startIndex -eq $startIndex }
 		$this.scopeStack.Push($scope.Id)
 	}
 
+
 	[void] ExitScope() {
 		$null = $this.scopeStack.Pop()
 	}
+
 
 	[int] GetCurrentScope() {
 		return $this.scopeStack.Peek()
 	}
 
+
 	[Scope] GetScopeById([int] $id) {
 		return $this.Scopes | Where-Object { $_.Id -eq $id }
 	}
+
 
 	[Scope] GetScopeByIndex([int] $index) {
 		return $this.Scopes | Where-Object { $_.StartIndex -le $index -and $_.EndIndex -ge $index } | Sort-Object StartIndex -Descending | Select-Object -First 1

@@ -22,7 +22,7 @@ class SemanticParser {
 		$this.MapLabels()	### This must be done before mapping scopes and symbols!
 		$this.MapScopes()	### This must be done before mapping symbols!
 		$this.MapSymbols()  ### This must be done before parsing tokens!
-		$this.ParseTokens(0, $this.inTokens.Count)
+		$this.ParseAllTokens()
 	}
 
 	SemanticParser() {}
@@ -452,36 +452,7 @@ class SemanticParser {
 				### Skip whitespace after mnemonic
 				$tokenIndex = $this.Skipwhitespace(++$tokenIndex)
 
-				### Relative
-				# if($mne -in 'BCC','BCS','BEQ','BMI','BNE','BPL','BVC','BVS') {
-				# 	$addressingMode = [MOS6502AddressingMode]::Relative
-
-				# 	$startIndex = $this.outTokens.Count
-				# 	$tokenIndex = $this.ParseTokens($tokenIndex, $instEndIndex-$tokenIndex)
-				# 	$endIndex = $this.outTokens.Count
-
-				# 	if ($startIndex -eq $endIndex -or (($this.outTokens[$startIndex..($endIndex-1)].Value -join '') -match '^(?s:\s|<#.*?#>|#.*$|//.*$)*$')) {
-				# 		# If no operand was found or if it only contains whitespace/comments, throw an error
-				# 		throw "Parser error: No operand found for instruction '$mne' at line $($token.Line), column $($token.Column)"
-				# 	}
-
-				# 	$this.InsertToken($startIndex, " -AddressingMode $($addressingMode) -Operand (")
-				# 	$this.AddToken(")")
-				# 	$this.AddToken(" -InvocationFile '$($token.Filename)' -InvocationLine $($token.Line)")
-				# 	$nextTokenIndex = $tokenIndex
-				# 	break
-				# }
-
-				### Implied
-				# if($mne -in 'ASL','CLC','CLD','CLI','CLV','DEX','DEY','INX','INY','LSR','NOP','PHA','PHP','PLA','PLP','ROL','ROR','RTI','RTS','SEC','SED','SEI','TAX','TAY','TSX','TXA','TXS','TYA') {
-				# 	$addressingMode = [MOS6502AddressingMode]::Implied
-				# 	$this.AddToken(" -AddressingMode $($addressingMode)")
-				# 	$this.AddToken(" -InvocationFile '$($token.Filename)' -InvocationLine $($token.Line)")
-				# 	$nextTokenIndex = $tokenIndex
-				# 	break
-				# }
-
-				### Rest of the addressing modes
+				### Addressing mode detection state machine
 				enum State {Init; Immediate; Absolute; AbsoluteIndexed; AbsoluteIndexedX; AbsoluteIndexedY; Indirect; IndirectAbsolute; IndirectIndexed; IndirectIndexedY; Indexed; IndexedX; IndexedXIndirect; Relative}
 
 				if($mne -in 'BCC','BCS','BEQ','BMI','BNE','BPL','BVC','BVS') {
@@ -497,6 +468,7 @@ class SemanticParser {
 					switch($tk.Type) {
 						([TokenType]::Whitespace) {break}
 						([TokenType]::Label) {
+							# Support label definitions at operand position, e.g. "lda myLabel:#0; inc myLabel;"
 							$symbolName = $tk.Value
 							$scopeId = $this.scopeManager.GetCurrentScope()
 							$this.AddToken(".label -name $($symbolName) -scopeId $($scopeId) -addr ((.pc) + 1);")
@@ -504,6 +476,7 @@ class SemanticParser {
 							break
 						}
 						([TokenType]::AnonymousLabel) {
+							# Support anonymous label definitions at operand position, e.g. "lda :#0; inc :-;"
 							$symbolName = "ANON_L$($tk.Line)_C$($tk.Column)"
 							$scopeId = $this.scopeManager.GetCurrentScope()
 							$this.AddToken(".label -name $($symbolName) -scopeId $($scopeId) -addr ((.pc) + 1);")
@@ -578,7 +551,6 @@ class SemanticParser {
 						throw "Parser error: No operand found for instruction '$mne' in addressing mode '$($addressingMode)' at line $($token.Line), column $($token.Column)"
 					}
 
-					# $this.InsertToken($startIndex, " -AddressingMode $($addressingMode) -Operand (")
 					$this.AddToken(")")
 				}
 				$this.AddToken(" -InvocationFile '$($token.Filename)' -InvocationLine $($token.Line)")

@@ -19,6 +19,13 @@
 /*****************************************************************************\
 *** MACROS ********************************************************************
 \*****************************************************************************/
+.macro .assert ($expr,$failMsg) {
+	if ($pasm.CurrentPass -gt 1) {
+		if (-not $expr) {
+			throw $failMsg
+		}
+	}
+}
 
 .macro BasicPrgHeader($Address=BasicPrgHeader.end, $BasicLineNumber=(Get-Date).Year) {
 	.pc $0801
@@ -103,13 +110,6 @@ end:
 	.fill (([math]::Ceiling((.pc) / $boundary) * $boundary) - (.pc)) {$fillByte}
 }
 
-.macro .assert ($expr,$failMsg) {
-	if ($pasm.CurrentPass -gt 1) {
-		if (-not $expr) {
-			throw $failMsg
-		}
-	}
-}
 
 .macro .break {
 	breakpoint:

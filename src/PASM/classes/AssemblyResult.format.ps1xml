@@ -17,9 +17,9 @@
                   $size   = $_.Binary.Count ? '$' + ('{0:X4}' -f $_.Binary.Count) : 'N/A'
                   $bhash  = $_.BinaryHash.length -ge 8 ? $_.BinaryHash.Substring(0,8) + '...' : 'N/A'
                   $info   = "$status  Load=$addr  Size=$size"
-                  if (-not $_.Success -and $_.ErrorMessage) {
+                  <!-- if (-not $_.Success -and $_.ErrorMessage) {
                     $info += "  `e[31mError: " + $_.ErrorMessage + "`e[0m"
-                  }
+                  } -->
                   $info
                 </ScriptBlock>
               </ExpressionBinding>

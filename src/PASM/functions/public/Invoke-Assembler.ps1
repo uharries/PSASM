@@ -24,43 +24,31 @@
 	.PARAMETER ListBinary
 	Prints a Hex Dump of the binary code produced by the assembler to the screen.
 
-	.PARAMETER Source
-	Specifies an Array if strings to process as the source code.
-
 	.INPUTS
 	An array of strings to process as the assembler source code.
 
 	.OUTPUTS
-	An Assemblerinformation object containing the properties: Success, LoadAddress, Symbols, PSSource, SourceMap, Assembly, AssemblyList, Binary, BinaryList, and BinaryHash.
+	An AssemblyResult object containing the properties: Success, ErrorMessage, LoadAddress, Scopes, Symbols, SymbolsFull, PSSource, Segments, SegmentInfo, Assembly, AssemblyList, Binary, BinaryList, BinaryHash, and Tokens.
 
 	.EXAMPLE
 	PS> $rc = Invoke-Assembler -SourceFile demo.s -OutFile demo.prg
-	Pass 1... OK! - Hash: 7554E67721301AD0A4CDDA94ACA9FEC8A64A9F25A2431CF83616AE9DC619469C
-	Pass 2... OK! - Hash: 7554E67721301AD0A4CDDA94ACA9FEC8A64A9F25A2431CF83616AE9DC619469C
+	Pass 1... OK!
+	Pass 2... OK!
+
+	✅ Assembly succeeded.
 
 	Writing 'demo.prg'...File Hash: 7554E67721301AD0A4CDDA94ACA9FEC8A64A9F25A2431CF83616AE9DC619469C
 
 	.EXAMPLE
 	PS> '.org $1000; inc $d020; jmp *-3' | Invoke-Assembler -OutFile demo.prg
-	Pass 1... OK! - Hash: 7554E67721301AD0A4CDDA94ACA9FEC8A64A9F25A2431CF83616AE9DC619469C
-	Pass 2... OK! - Hash: 7554E67721301AD0A4CDDA94ACA9FEC8A64A9F25A2431CF83616AE9DC619469C
+	Pass 1... OK!
+	Pass 2... OK!
+
+	✅ Assembly succeeded.
 
 	Writing 'demo.prg'...File Hash: 7554E67721301AD0A4CDDA94ACA9FEC8A64A9F25A2431CF83616AE9DC619469C
 
-	Success      : True
-	LoadAddress  : 4096
-	Symbols      : {[____load_addr, System.Collections.Hashtable]}
-	PSSource     : .org 0x1000;.inst inc Absolute (0xd020)
-	SourceMap    : {SourceMapLine, SourceMapLine}
-	Assembly     : {}
-	AssemblyList : $1000: ee 20 d0 - Ln: 1   Col: 13  - .org 0x1000;inc 0xd020;jmp  ($pasm.pc) -3 - .org 0x1000;.inst inc
-				Absolute (0xd020)
-
-	Binary       : {0, 16, 238, 32…}
-	BinaryList   : $0000: 00 10 ee 20 d0                                    '... .'
-
-	BinaryHash   : 7554E67721301AD0A4CDDA94ACA9FEC8A64A9F25A2431CF83616AE9DC619469C
-
+    [OK]  Load=$1000  Size=$0006
 #>
 function Invoke-Assembler {
 	[CmdletBinding()]
@@ -93,6 +81,8 @@ function Invoke-Assembler {
 		[Alias("h","hexdump","DumpHex","dump","hex")]
 		[switch]$ListBinary,
 
+		[switch]$NoBanner,
+
 		[Alias("q")]
 		[switch]$NoHostOutput,
 
@@ -102,7 +92,7 @@ function Invoke-Assembler {
 	BEGIN {
 		$ErrorActionPreference = 'Stop'
 		function Print-Banner {
-			$vTag = format-string -Text "Version $($script:ModuleVersion)" -Format Center -OutputStringWidth 21
+			$vTag = format-string -Text "Version $($script:ModuleFullVersion)" -Format Center -OutputStringWidth 21
 			Write-Host "                                                      "
 			Write-Host '        _/_/_/      _/_/      _/_/_/  _/      _/      '
 			Write-Host '       _/    _/  _/    _/  _/        _/_/  _/_/       '
@@ -133,7 +123,7 @@ function Invoke-Assembler {
 	}
 
 	END {
-		if (-not $NoHostOutput) {
+		if (-not $NoHostOutput -and -not $NoBanner) {
 			Print-Banner
 		}
 
@@ -214,20 +204,10 @@ function Invoke-Assembler {
 				Write-Host ("`nWriting '$OutFile'...") -NoNewline
 			}
 			if (-not(Test-Path -Path $OutFile)) {
-				New-Item -Path $OutFile -Force
+				$null =New-Item -Path $OutFile -Force
 			}
 			$asmInfo.Binary | set-content -asbytestream -path $OutFile -Force
 			if (-not $NoHostOutput) {
-				for ($i = 0; $i -lt $maxRetries; $i++) {
-					try {
-						$hash = (Get-FileHash -Algorithm SHA256 -Path $OutFile -ErrorAction Stop).Hash
-						break
-					}
-					catch {
-						Start-Sleep -Milliseconds $delayMs
-					}
-				}
-
 				for ($i = 0; $i -lt 30; $i++) {
 					try {
 						$hash = (Get-FileHash -Algorithm SHA256 -Path $OutFile -ErrorAction Stop).Hash
@@ -238,14 +218,15 @@ function Invoke-Assembler {
 				}
 
 				if (-not $hash) {
-					throw "Failed to compute file hash for: $OutFile"
+					Write-Error "Failed to compute file hash for: $OutFile" -ErrorAction Continue
+					$hash = "N/A"
 				}
 
 				Write-Host ("File Hash: {0:x}" -f $hash)
 			}
 			if ($LabelFile) {
 				if (-not(Test-Path -Path $LabelFile)) {
-					New-Item -Path $LabelFile -Force
+					$null = New-Item -Path $LabelFile -Force
 				}
 				$asmInfo.symbols.ForEach({"al {0:x6} .{1}" -f $_.Value, $_.Name}) | set-content -path $LabelFile -Force
 			}
