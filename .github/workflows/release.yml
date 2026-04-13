@@ -236,7 +236,6 @@ jobs:
       # Skipped silently when PSGALLERY_API_KEY secret is not configured.
       # Add the secret in repo Settings → Secrets → Actions to activate.
       - name: Publish to PSGallery
-        if: ${{ env.PSGALLERY_API_KEY != '' }}
         env:
           PSGALLERY_API_KEY: ${{ secrets.PSGALLERY_API_KEY }}
         shell: pwsh
