@@ -30,7 +30,7 @@ Author = 'Ulf Diabelez Harries'
 Copyright = '(c) Ulf Diabelez Harries. All rights reserved.'
 
 # Description of the functionality provided by this module
-# Description = ''
+Description = 'PASM is a PowerShell-based assembler for 6502/6510-based platforms'
 
 # Minimum version of the PowerShell engine required by this module
 # PowerShellVersion = ''
