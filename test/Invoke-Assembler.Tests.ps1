@@ -71,8 +71,8 @@ Describe 'Invoke-Assembler Function' {
 	}
 
 	Context 'Error handling' {
-		It 'Should throw a syntax error if PASM fails' {
-			{ Invoke-Assembler -Source "INVALID CODE" -NoHostOutput } | Should -Throw
+		It 'Should throw an error if PASM fails' {
+			{ Invoke-Assembler -SourceFile "INVALID FILE NAME" -NoHostOutput } | Should -Throw
 		}
 	}
 
@@ -259,7 +259,9 @@ Describe 'Include File Handling' {
 			Set-Content -Path $testFileA -Value '.include "testB.s"' -Force
 			Set-Content -Path $testFileB -Value '.include "testA.s"' -Force
 
-			{ Invoke-Assembler -SourceFile $testFileA -NoHostOutput } | Should -Throw "Circular include detected*"
+			$result = Invoke-Assembler -SourceFile $testFileA -NoHostOutput
+			$result.Success | Should -BeFalse
+			$result.ErrorMessage | Should -Match "Circular include detected"
 		}
 
 		It 'Should skip re-inclusion of include-once files' {
@@ -364,33 +366,35 @@ Describe 'Segment Handling' {
 		#
 		# Size limit (should throw)
 		#
-		It 'Throws when segment exceeds -Size' -TestCases @(
+		It 'Fails when segment exceeds -Size' -TestCases @(
 			@{
 				code     = '.segment small -Size 1; lda #1; lda #2'
 				expected = "Segment 'small' exceeds defined Size of 0x0001 with actual size 0x0004"
 			}
 		) {
-			{ $code | Invoke-Assembler -NoHostOutput } |
-				Should -Throw $expected
+			$result = $code | Invoke-Assembler -NoHostOutput
+			$result.Success | Should -BeFalse
+			$result.ErrorMessage | Should -Match $expected
 		}
 
 		#
 		# End limit (should throw)
 		#
-		It 'Throws when segment exceeds -End' -TestCases @(
+		It 'Fails when segment exceeds -End' -TestCases @(
 			@{
 				code = '.segment s -Start $1000 -End $1001; lda #1; lda #2'
 				expected = "Segment 's' exceeds defined End at 0x1001 with actual end address 0x1003"
 			}
 		) {
-			{ $code | Invoke-Assembler -NoHostOutput } |
-				Should -Throw $expected
+			$result = $code | Invoke-Assembler -NoHostOutput
+			$result.Success | Should -BeFalse
+			$result.ErrorMessage | Should -Match $expected
 		}
 
 		#
 		# Overlap detection
 		#
-		It 'Throws on overlapping segments' -TestCases @(
+		It 'Fails on overlapping segments' -TestCases @(
 			@{
 				code = @'
 	.segment a -Start $2000
@@ -401,8 +405,9 @@ Describe 'Segment Handling' {
 				expected = "Segment 'b' overlaps 'a' at address 0x2001"
 			}
 		) {
-			{ $code | Invoke-Assembler -NoHostOutput } |
-				Should -Throw $expected
+			$result = $code | Invoke-Assembler -NoHostOutput
+			$result.Success | Should -BeFalse
+			$result.ErrorMessage | Should -Match $expected
 		}
 
 		#
@@ -445,14 +450,15 @@ Describe 'Segment Handling' {
 			($code | Invoke-Assembler -NoHostOutput).Binary | Should -Be $binary
 		}
 
-		It 'Throws on invalid alignments' -TestCases @(
+		It 'Fails on invalid alignments' -TestCases @(
 			@{
 				code = '.segment a -Align -1; lda #1'
 				expected = "Cannot find end of address space for segment 'a'"
 			}
 		) {
-			{ $code | Invoke-Assembler -NoHostOutput } |
-				Should -Throw $expected
+			$result = $code | Invoke-Assembler -NoHostOutput
+			$result.Success | Should -BeFalse
+			$result.ErrorMessage | Should -Match $expected
 		}
 
 
@@ -656,37 +662,61 @@ Describe 'Segment Handling' {
     }
 
     Context 'Error cases' {
-        It 'Throws on invalid parameter combinations' -TestCases @(
-            @{ code = '.segment a -Start $1000 -End $1003 -Size 4; lda #1' ; expected = "Cannot specify both End and Size*" }
-            @{ code = '.segment a -Start $1000 -StartAfter b; lda #1'      ; expected = "Cannot specify both Start and StartAfter*" }
-            @{ code = '.segment a -StartAfter b -End $1003 -Size 4'        ; expected = "Cannot specify both End and Size*" }
-        ) { { $code | Invoke-Assembler -NoHostOutput } | Should -Throw $expected }
+        It 'Fails on invalid parameter combinations' -TestCases @(
+            @{ code = '.segment a -Start $1000 -End $1003 -Size 4; lda #1' ; expected = "Cannot specify both End and Size" }
+            @{ code = '.segment a -Start $1000 -StartAfter b; lda #1'      ; expected = "Cannot specify both Start and StartAfter" }
+            @{ code = '.segment a -StartAfter b -End $1003 -Size 4'        ; expected = "Cannot specify both End and Size" }
+        ) {
+			$result = $code | Invoke-Assembler -NoHostOutput
+			$result.Success | Should -BeFalse
+			$result.ErrorMessage | Should -Match $expected
+		}
 
-        It 'Throws when segment exceeds Size' -TestCases @(
-            @{ code = '.segment a -Size 1; lda #1; lda #2' ; expected = "Segment 'a' exceeds defined Size*" }
-        ) { { $code | Invoke-Assembler -NoHostOutput } | Should -Throw $expected }
+        It 'Fails when segment exceeds Size' -TestCases @(
+            @{ code = '.segment a -Size 1; lda #1; lda #2' ; expected = "Segment 'a' exceeds defined Size" }
+        ) {
+			$result = $code | Invoke-Assembler -NoHostOutput
+			$result.Success | Should -BeFalse
+			$result.ErrorMessage | Should -Match $expected
+		}
 
-        It 'Throws when segment exceeds End' -TestCases @(
-            @{ code = '.segment a -Start $1000 -End $1001; lda #1; lda #2' ; expected = "Segment 'a' exceeds defined End*" }
-        ) { { $code | Invoke-Assembler -NoHostOutput } | Should -Throw $expected }
+        It 'Fails when segment exceeds End' -TestCases @(
+            @{ code = '.segment a -Start $1000 -End $1001; lda #1; lda #2' ; expected = "Segment 'a' exceeds defined End" }
+        ) {
+			$result = $code | Invoke-Assembler -NoHostOutput
+			$result.Success | Should -BeFalse
+			$result.ErrorMessage | Should -Match $expected
+		}
 
-        It 'Throws on overlap without AllowOverlap' -TestCases @(
+        It 'Fails on overlap without AllowOverlap' -TestCases @(
             @{
                 code = @'
 .segment a -Start $2000; lda #1
 .segment b -Start $2001; lda #2
 '@
-                expected = "Segment 'b' overlaps 'a'*"
+                expected = "Segment 'b' overlaps 'a'"
             }
-        ) { { $code | Invoke-Assembler -NoHostOutput } | Should -Throw $expected }
+        ) {
+			$result = $code | Invoke-Assembler -NoHostOutput
+			$result.Success | Should -BeFalse
+			$result.ErrorMessage | Should -Match $expected
+		}
 
-        It 'Throws on negative align without End' -TestCases @(
-            @{ code = '.segment a -Align -1; lda #1' ; expected = "Cannot find end of address space*" }
-        ) { { $code | Invoke-Assembler -NoHostOutput } | Should -Throw $expected }
+        It 'Fails on negative align without End' -TestCases @(
+            @{ code = '.segment a -Align -1; lda #1' ; expected = "Cannot find end of address space" }
+        ) {
+			$result = $code | Invoke-Assembler -NoHostOutput
+			$result.Success | Should -BeFalse
+			$result.ErrorMessage | Should -Match $expected
+		}
 
-        It 'Throws on stack underflow' -TestCases @(
-            @{ code = '.popsegment' ; expected = "Segment stack underflow*" }
-        ) { { $code | Invoke-Assembler -NoHostOutput } | Should -Throw $expected }
+        It 'Fails on stack underflow' -TestCases @(
+            @{ code = '.popsegment' ; expected = "Segment stack underflow" }
+        ) {
+			$result = $code | Invoke-Assembler -NoHostOutput
+			$result.Success | Should -BeFalse
+			$result.ErrorMessage | Should -Match $expected
+		}
     }
 
 	Context 'Run Address' {

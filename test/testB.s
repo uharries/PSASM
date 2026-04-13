@@ -1,1 +1,2 @@
-.byte 2
+.include '.\test\testA.s'
+

@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Configuration>
+  <ViewDefinitions>
+    <View>
+      <Name>AssemblyResult</Name>
+      <ViewSelectedBy>
+        <TypeName>AssemblyResult</TypeName>
+      </ViewSelectedBy>
+      <CustomControl>
+        <CustomEntries>
+          <CustomEntry>
+            <CustomItem>
+              <ExpressionBinding>
+                <ScriptBlock>
+                  $status = $_.Success ? "`e[32m[OK]`e[0m" : "`e[31m[FAILED]`e[0m"
+                  $addr   = $_.LoadAddress ? '$' + ('{0:X4}' -f $_.LoadAddress) : 'N/A'
+                  $size   = $_.Binary.Count ? '$' + ('{0:X4}' -f $_.Binary.Count) : 'N/A'
+                  $bhash  = $_.BinaryHash.length -ge 8 ? $_.BinaryHash.Substring(0,8) + '...' : 'N/A'
+                  $info   = "$status  Load=$addr  Size=$size"
+                  if (-not $_.Success -and $_.ErrorMessage) {
+                    $info += "  `e[31mError: " + $_.ErrorMessage + "`e[0m"
+                  }
+                  $info
+                </ScriptBlock>
+              </ExpressionBinding>
+              <NewLine/>
+            </CustomItem>
+          </CustomEntry>
+        </CustomEntries>
+      </CustomControl>
+    </View>
+  </ViewDefinitions>
+</Configuration>

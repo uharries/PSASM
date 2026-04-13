@@ -109,7 +109,7 @@ class PASM {
 		$this.AddLine([byte[]]($data | ForEach-Object{_loByte $_;_hiByte $_}), $invocationFile, $invocationLine)
 	}
 
-	[SemanticParser]Parse() {
+	[void]Parse() {
 		# $this.SourceFiles | ft -auto | out-string | write-host
 		$this.parser = [SemanticParser]::new($this.FileStack)
 		$this.BuildSourceLines()
@@ -122,10 +122,9 @@ class PASM {
 		$this.symbolManager.scopes = $this.scopes
 		# write-host $this.psSource
 		# $this.Macros | ft -auto | out-string | write-host
-		return $this.parser
 	}
 
-	[AssemblerInformation]Assemble() {
+	[void]Assemble() {
 		$success=$false
 		$bin=[System.Collections.Generic.List[byte]]::new()
 
@@ -145,14 +144,14 @@ class PASM {
 			try {
 				$sb = [ScriptBlock]::Create(($this.psSource | out-string))
 			} catch {
-				$_.Exception.Data["TOKENS"] = $this.parser.inTokens
+				# $asmInfo = $this.ToResult()
+				# $asmInfo.Success = $false
+				# $asmInfo.ErrorMessage = "Error in parsing generated PowerShell source code: " + $_.Exception.Message
+				# $_.Exception.Data["AssemblyResult"] = $asmInfo
 				if(-not $this.NoHostOutput) {
 					Write-Host " FAILED!"
-					Write-Host "Error in parsing generated PowerShell source code!"
-					Write-Host $this.psSource
-					Write-Host "Scopes: $($this.symbolManager.Scopes | ft -auto | out-string)"
-					Write-Host "SymbolTable: $($this.symbolManager.GetFullSymbolTable() | ft -auto | out-string)"
-					Write-Host "Look at `$Error[0].Exception.Data['TOKENS'] for the tokens"
+					# Write-Host "Error in parsing generated PowerShell source code!"
+					# Write-Host "Look at `$Error[0].Exception.Data['AssemblyResult'] for the details."
 				}
 				throw
 				# throw [System.Exception]::new(("Error in psSource line {0}, column {1}: {2}: {3} '{4}'" -f
@@ -171,14 +170,14 @@ class PASM {
 				# Write-Error -Message ("Error in psSource line {0}, column {1}: {2} '{3}' {4}" -f $error[0].InvocationInfo.ScriptLineNumber, $error[0].InvocationInfo.OffsetInLine, $error[0].CategoryInfo.Reason, $error[0].CategoryInfo.TargetName, $error[0].Exception.Message)
 				# Write-Error -Message ("Error in psSource line {0}, column {1}: {2} '{3}'" -f $error[0].InvocationInfo.ScriptLineNumber, $error[0].InvocationInfo.OffsetInLine, $error[0].CategoryInfo.Reason, $error[0].CategoryInfo.TargetName) -ErrorAction Stop
 				if ($psError) {
-					$_.Exception.Data["TOKENS"] = $this.parser.inTokens
+					# $asmInfo = $this.ToResult()
+					# $asmInfo.Success = $false
+					# $asmInfo.ErrorMessage = "Error in executing generated PowerShell source code: " + $_.Exception.Message
+					# $_.Exception.Data["AssemblyResult"] = $asmInfo
 					if(-not $this.NoHostOutput) {
 						Write-Host " FAILED!"
-						Write-Host "Error in executing generated PowerShell source code!"
-						Write-Host $this.psSource
-						Write-Host "Scopes: $($this.symbolManager.Scopes | ft -auto | out-string)"
-						Write-Host "SymbolTable: $($this.symbolManager.GetFullSymbolTable() | ft -auto | out-string)"
-						Write-Host "Look at `$Error[0].Exception.Data['TOKENS'] for the tokens"
+						# Write-Host "Error in executing generated PowerShell source code!"
+						# Write-Host "Look at `$Error[0].Exception.Data['AssemblyResult'] for the details."
 					}
 					throw $_
 					# throw [System.Exception]::new(("Error in psSource line {0}, column {1}: {2} '{3}'" -f $psError[0].InvocationInfo.ScriptLineNumber, $psError[0].InvocationInfo.OffsetInLine, $psError[0].CategoryInfo.Reason, $psError[0].CategoryInfo.TargetName))
@@ -215,7 +214,8 @@ class PASM {
 			$this.binaryHash = [System.BitConverter]::ToString([System.Security.Cryptography.SHA256CryptoServiceProvider]::new().ComputeHash($bin)) -replace '-',''
 			if(-not $this.NoHostOutput) {
 				# Write-Progress -Activity "Assembly" -Status "Pass $($i)" -PercentComplete (100 / $this.MaxPasses * $i)
-				Write-Host (" OK! - Hash: {0}" -f $this.binaryHash)
+				# Write-Host (" OK! - Hash: {0}" -f $this.binaryHash)
+				Write-Host " OK!"
 			}
 			if ($this.binaryHash -eq $oldHash) {
 				# if ($this.symbolManager.Symbols.Values.Values.Resolved -contains $false) {
@@ -235,24 +235,27 @@ class PASM {
 		if (!$success) {
 			throw [System.Exception]::new("Maximum number of passes exceeded: $($this.MaxPasses)")
 		}
+	}
 
-		$asmInfoParams = @{
-			Success = $true
-			LoadAddress = $this.loadAddress
-			Scopes = $this.scopes
-			# Symbols = $this.symbolManager.GetFullSymbolTable()
-			Symbols = $this.symbolManager.GetSymbolTable()
-			Segments = $this.Segments.Segments
-			PSSource = $this.psSource | Out-String
-			Assembly = $this.assembly
-			AssemblyList = $this.ListAssembly()
-			Binary = $this.binary
-			BinaryList = $this.HexDump()
-			BinaryHash = $this.binaryHash
-			SegmentInfo = $this.Segments.DumpSegments()
-		}
 
-		return ([AssemblerInformation]::new($asmInfoParams))
+	[AssemblyResult]ToResult() {
+		$info = [AssemblyResult]::new()
+		$info.LoadAddress  = $this.loadAddress
+		$info.Scopes       = $this.scopes
+		$info.Symbols      = $this.symbolManager?.GetSymbolTable()
+		$info.SymbolsFull  = $this.symbolManager?.GetFullSymbolTable()
+		$info.PSSource     = $this.PSSource
+		$info.Segments     = $this.Segments?.Segments
+		$info.SegmentInfo  = $this.Segments?.DumpSegments()
+		$info.Assembly     = $this.Assembly
+		$info.AssemblyList = $this.ListAssembly()
+		$info.Binary       = $this.Binary
+		$info.BinaryList   = $this.HexDump()
+		$info.BinaryHash   = $this.BinaryHash
+		$info.Tokens	   = $this.parser?.inTokens
+
+		# ... anything else $pasm knows about
+		return $info
 	}
 
 	###

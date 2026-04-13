@@ -125,7 +125,7 @@ function Invoke-Assembler {
 			if ($InputObject -is [System.IO.FileInfo]) {
 				$SourceFiles += $InputObject
 			} elseif ($InputObject -is [string]) {
-				$SourceLines.AppendLine($InputObject)
+				$null = $SourceLines.AppendLine($InputObject)
 			} else {
 				Write-Warning -Message "Ignoring unsupported input object: $($InputObject.GetType().FullName)"
 			}
@@ -163,13 +163,33 @@ function Invoke-Assembler {
 			$pasm.LoadVirtualFile("<PipeLine>", $SourceLines.ToString())
 		}
 
-		$pasm.Parse()
-
-		if ($DumpPSfile) {
-			$pasm.psSource | set-content -path $DumpPSfile -Force
+		try {
+			$pasm.Parse()
+			$pasm.Assemble()
+			$asmInfo = $pasm.ToResult()
+			$asmInfo.Success = $true
+		} catch {
+			$asmInfo = $pasm.ToResult()
+			$asmInfo.Success = $false
+			$asmInfo.ErrorMessage = $_.Exception.Message
+			$_.Exception.Data["AssemblyResult"] = $asmInfo
 		}
 
-		$asmInfo = $pasm.Assemble()
+		if (-not $asmInfo.Success) {
+			if (-not $NoHostOutput) {
+				Write-Host "`n❌ Assembly failed: $($asmInfo.ErrorMessage)" -ForegroundColor Red
+				Write-Host "`nℹ️  `e[3mYou can inspect `e[0m`e[33m`$Error[0].Exception.Data['AssemblyResult']`e[0m `e[3mfor the details, if you did not save the assembly result to a variable.`e[0m`n"
+			}
+			return $asmInfo
+		} else {
+			if (-not $NoHostOutput) {
+				Write-Host "`n✅ Assembly succeeded.`n" -ForegroundColor Green
+			}
+		}
+
+		if ($DumpPSfile) {
+			$asminfo.psSource | set-content -path $DumpPSfile -Force
+		}
 
 		if ($ListFile) {
 			$asmInfo.AssemblyList | set-content -path $ListFile -Force

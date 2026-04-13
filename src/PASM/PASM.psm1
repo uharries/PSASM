@@ -31,10 +31,12 @@ Get-ChildItem -Path "$PSScriptRoot\Enums\*.ps1" -ErrorAction Ignore | ForEach-Ob
 . "$PSScriptRoot\Classes\PASMAttribute.ps1"
 . "$PSScriptRoot\Classes\AssemblyLine.ps1"
 . "$PSScriptRoot\Classes\MOS6502.ps1"
-. "$PSScriptRoot\Classes\AssemblerInformation.ps1"
+. "$PSScriptRoot\Classes\AssemblyResult.ps1"
 . "$PSScriptRoot\Classes\SegmentManager.ps1"
 . "$PSScriptRoot\Classes\PASM.ps1"
 
+# --- Load FormatData ---
+Update-FormatData -PrependPath "$PSScriptRoot\Classes\AssemblyResult.format.ps1xml"
 
 # --- Load Private Functions ---
 Get-ChildItem -Path "$PSScriptRoot\Functions\Private\*.ps1" -ErrorAction Ignore | ForEach-Object {
