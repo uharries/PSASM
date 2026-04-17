@@ -1,6 +1,6 @@
-![logo](docs/pasm_logo.png)
-# PASM - The PowerShell 6502 Assembler
-> *PASM is a PowerShell-based assembler for 6502/6510-based platforms, created by Ulf Diabelez Harries*
+![logo](docs/psasm_logo.png)
+# PSASM - Assembly reimagined for PowerShell
+> *PSASM is a PowerShell-based 6502/6510 cross-assembler for Commodore 64 and other classic 8-bit systems, enabling developers to blend assembly with modern scripting power.*
 
 ## Abstract
 This project aims to develop a 6502 cross assembler using PowerShell, harnessing the full capabilities of PowerShell for developers. The assembler’s input source code is converted into PowerShell-compatible code, which is then executed to produce the final binary code. This approach enables developers to utilize the complete range of PowerShell functionalities in generating the resulting binary code.
@@ -47,7 +47,7 @@ After reloading your PowerShell environment, the build script will make use of t
 
 If you want to use it in another PowerShell session, you can manually import it by running:
 
-- `Import-Module <repo path>\build\PASM.psm1`
+- `Import-Module <repo path>\build\PSASM.psd1`
 
 ## Running the Assembler
 In order to assemble your very first C64 prg file, you run the command: Invoke-Assembler.
@@ -55,36 +55,61 @@ In order to assemble your very first C64 prg file, you run the command: Invoke-A
 In it's simplest form, it could look something like this:
 
 ```
-PS> $rc = Invoke-Assembler -SourceFile demo.s -OutFile demo.prg
-	Pass 1... OK! - Hash: 7554E67721301AD0A4CDDA94ACA9FEC8A64A9F25A2431CF83616AE9DC619469C
-	Pass 2... OK! - Hash: 7554E67721301AD0A4CDDA94ACA9FEC8A64A9F25A2431CF83616AE9DC619469C
+PS> $result = Invoke-Assembler -SourceFile demo.s -OutFile demo.prg
+Pass 1... OK!
+Pass 2... OK!
 
-	Writing 'demo.prg'...File Hash: 7554E67721301AD0A4CDDA94ACA9FEC8A64A9F25A2431CF83616AE9DC619469C
+✅ Assembly succeeded.
+
+Writing 'demo.prg'...File Hash: 7554E67721301AD0A4CDDA94ACA9FEC8A64A9F25A2431CF83616AE9DC619469C
 ```
 
 This would render a .PRG file from your 1337 demo.s source code.
 
 Invoke-Assembler will also take your source code from the pipeline:
 ```
-	PS> '.org $1000; inc $d020; jmp *-3' | Invoke-Assembler -OutFile demo.prg
-	Pass 1... OK! - Hash: D072F0ECF7AA1BEC474BB499EA973111779E74FEB141ABA18C1E10B20E90DF4A
-	Pass 2... OK! - Hash: D072F0ECF7AA1BEC474BB499EA973111779E74FEB141ABA18C1E10B20E90DF4A
+PS> '.org $1000; inc $d020; jmp *-3' | Invoke-Assembler -OutFile demo.prg
+Pass 1... OK!
+Pass 2... OK!
 
-	Writing 'demo.prg'...File Hash: D072F0ECF7AA1BEC474BB499EA973111779E74FEB141ABA18C1E10B20E90DF4A
+✅ Assembly succeeded.
 
-	Success      : True
-	LoadAddress  : 4096
-	Symbols      : {[____load_addr, System.Collections.Hashtable]}
-	PSSource     : .org 0x1000; .inst -Mnemonic inc -AddressingMode Absolute -Opera...
-	SourceMap    : {System.Collections.Hashtable}
-	Assembly     : {, }
-	AssemblyList : $1000: ee 20 d0 - Ln: 1   Col: 14  - .org $1000 - .org 0x1000; ....
-	Binary       : {0, 16, 238, 32…}
-	BinaryList   : $0000: 00 10 ee 20 d0 4c 00 10                           '... .L..'
+Writing 'demo.prg'...File Hash: 7554E67721301AD0A4CDDA94ACA9FEC8A64A9F25A2431CF83616AE9DC619469C
 
-	BinaryHash   : D072F0ECF7AA1BEC474BB499EA973111779E74FEB141ABA18C1E10B20E90DF4A
+[OK]  Load=$1000  Size=$0006
 ```
-And as the output was not assigned to a variable, it got dumped to stdout, so you can see the properties and type of data that is available from the returned `AssemblerInformation` object.
+And as the output was not assigned to a variable, it got dumped to stdout.
+
+Invoke-Assembler returns an `AssemblyResult` object with rich information on assembly status, error messages, assembly artifacts, etc.
+
+The default formatting of this object when displayed is heavily reduced to not convolute your console. In the above example it is the `[OK]  Load=$1000  Size=$0006` line.
+
+If you assign the result to a variable, e.g. `$result`, like in the first example, you can inpect the individual properties or just dump them all to the console: `$result | fl`
+
+The properties of the returned `AssemblyResult` object are:
+
+```
+   TypeName: AssemblyResult
+
+Name         MemberType Definition
+----         ---------- ----------
+Assembly     Property   array Assembly {get;set;}
+AssemblyList Property   string AssemblyList {get;set;}
+Binary       Property   byte[] Binary {get;set;}
+BinaryHash   Property   string BinaryHash {get;set;}
+BinaryList   Property   string BinaryList {get;set;}
+ErrorMessage Property   string ErrorMessage {get;set;}
+LoadAddress  Property   ushort LoadAddress {get;set;}
+PSSource     Property   string PSSource {get;set;}
+Scopes       Property   Scope[] Scopes {get;set;}
+SegmentInfo  Property   string SegmentInfo {get;set;}
+Segments     Property   System.Object[] Segments {get;set;}
+Success      Property   bool Success {get;set;}
+Symbols      Property   System.Object[] Symbols {get;set;}
+SymbolsFull  Property   System.Object[] SymbolsFull {get;set;}
+Tokens       Property   Token[] Tokens {get;set;}
+```
+
 
 ## Assembler Directives
 
@@ -193,7 +218,7 @@ This will load the low 8 bits of the 16 bit value *screen* into the accumulator.
 
 # Segments
 
-Segments are named memory regions that control where your code and data end up in the final binary. If you've used linkers like ld65, the concept is similar — but in PASM, segments are defined and switched inline with your code rather than in a separate linker configuration file.
+Segments are named memory regions that control where your code and data end up in the final binary. If you've used linkers like ld65, the concept is similar — but in PSASM, segments are defined and switched inline with your code rather than in a separate linker configuration file.
 
 ---
 
@@ -466,4 +491,4 @@ Start: {									// Create a label and a scope named Start
 	Write-Host $SomeOtherVar				// Outputs the text '67' to the console
 }
 ```
-PowerShell does not provide any way to refer to PowerShell variables in sibling scopes, so if you want to access $SomeVar from different sibling scopes, you need to place the variable in a common parent scope.
+PowerShell does not provide any way to refer to PowerShell variables in sibling scopes, so if you want to access `$SomeVar` from different sibling scopes, you need to place the variable in a common parent scope.

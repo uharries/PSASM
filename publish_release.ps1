@@ -26,4 +26,4 @@ git tag -a $tag -m $Message
 git push origin $tag
 
 Write-Host "✅ Tagged and pushed $tag — GitHub Actions will handle the rest." -ForegroundColor Green
-Write-Host "   Watch progress at: https://github.com/uharries/pasm/actions" -ForegroundColor Gray
+Write-Host "   Watch progress at: https://github.com/uharries/PSASM/actions" -ForegroundColor Gray

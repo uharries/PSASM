@@ -1,2 +1,1 @@
-.segment code -Start $1001 -Align 256
-nop
+.macro mac($val){lda #0};mac(0)

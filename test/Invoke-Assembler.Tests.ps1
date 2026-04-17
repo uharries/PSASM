@@ -1,6 +1,11 @@
 BeforeAll {
-	# Import the module containing Invoke-Assembler
-	Import-Module -Name "$PSSCriptRoot\..\src\PASM\PASM.psm1" -ErrorAction Stop -Force
+    $ModuleName = 'PSASM'
+
+	$SourcePath = Join-Path -Path (Resolve-Path ./src) -ChildPath $ModuleName
+	$ModulePath = (Resolve-Path(Join-Path -Path $SourcePath -ChildPath "$ModuleName.psm1")).Path
+
+# Import the module containing Invoke-Assembler
+	Import-Module -Name $ModulePath -ErrorAction Stop -Force
 
 	# Optional: Verify the function exists
 	if (-not (Get-Command -Name Invoke-Assembler -ErrorAction SilentlyContinue)) {
@@ -71,7 +76,7 @@ Describe 'Invoke-Assembler Function' {
 	}
 
 	Context 'Error handling' {
-		It 'Should throw an error if PASM fails' {
+		It 'Should throw an error if assembler fails' {
 			{ Invoke-Assembler -SourceFile "INVALID FILE NAME" -NoHostOutput } | Should -Throw
 		}
 	}

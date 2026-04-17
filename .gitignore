@@ -2,6 +2,7 @@
 build/
 output/
 psout.ps1
-src/PASM/globals/VersionInfo.ps1
+src/PSASM/globals/VersionInfo.ps1
 test/*.lbl
 test/*.lst
+test/*.mon

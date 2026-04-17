@@ -1,6 +1,6 @@
 # .github/workflows/release.yml
 #
-# PASM Module Release Pipeline
+# PSASM Module Release Pipeline
 # ─────────────────────────────────────────────────────────────────────────────
 # Trigger by pushing a version tag. The tag IS the version — what you tag
 # is exactly what gets published. The .psd1 in source control keeps a
@@ -10,11 +10,8 @@
 #   Pre-release/beta:   git tag v1.4.0-beta.1    && git push --tags
 #   Pre-release/prev:   git tag v1.4.0-preview.2 && git push --tags
 #
-# Secrets required (repo Settings → Secrets → Actions):
-#   PSGALLERY_API_KEY   — your NuGet/PSGallery API key
+# Secrets required (repo Settings → Secrets → Actions): PSGALLERY_API_KEY
 #
-# The publish step is guarded by the secret being present, so the entire
-# workflow runs correctly without it.
 # ─────────────────────────────────────────────────────────────────────────────
 
 name: Release
@@ -30,7 +27,7 @@ permissions:
 jobs:
   release:
     name: Build and publish
-    runs-on: windows-latest   # PowerShell module — native Windows runner avoids cross-platform quirks
+    runs-on: windows-latest
 
     steps:
 
@@ -98,14 +95,14 @@ jobs:
           }
 
       # ── 4. Stamp version into manifest ─────────────────────────────────────
-      # Writes the tag version into PASM.psd1 and VersionInfo.ps1.
+      # Writes the tag version into PSASM.psd1 and VersionInfo.ps1.
       # The source-controlled .psd1 keeps a placeholder (e.g. 0.0.0) —
       # the real version only ever exists in the build artifact.
       - name: Stamp version into manifest
         id: version
         shell: pwsh
         run: |
-          $moduleName   = 'PASM'
+          $moduleName   = 'PSASM'
           $sourcePath   = Join-Path (Resolve-Path ./src) $moduleName
           $manifestPath = Join-Path $sourcePath "$moduleName.psd1"
           $versionInfo  = Join-Path $sourcePath 'globals' 'VersionInfo.ps1'
@@ -152,7 +149,7 @@ jobs:
       - name: Run PSScriptAnalyzer
         shell: pwsh
         run: |
-          $moduleName = 'PASM'
+          $moduleName = 'PSASM'
           $sourcePath = Join-Path (Resolve-Path ./src) $moduleName
           $modulePath = Join-Path $sourcePath "$moduleName.psm1"
 
@@ -206,7 +203,7 @@ jobs:
       - name: Build release artifact
         shell: pwsh
         run: |
-          $moduleName  = 'PASM'
+          $moduleName  = 'PSASM'
           $sourcePath  = Join-Path (Resolve-Path ./src) $moduleName
           $outputPath  = './build'
           $destination = Join-Path $outputPath $moduleName
@@ -223,25 +220,23 @@ jobs:
         shell: pwsh
         run: |
           $version    = '${{ steps.tag.outputs.full_version }}'
-          $zipName    = "PASM-$version.zip"
+          $zipName    = "PSASM-$version.zip"
           $zipPath    = "./build/$zipName"
 
-          Compress-Archive -Path './build/PASM' -DestinationPath $zipPath -Force
+          Compress-Archive -Path './build/PSASM' -DestinationPath $zipPath -Force
           Write-Host "✅ Zipped: $zipPath" -ForegroundColor Green
 
           "zip_path=$zipPath" >> $env:GITHUB_OUTPUT
           "zip_name=$zipName" >> $env:GITHUB_OUTPUT
 
       # ── 9. Publish to PSGallery ────────────────────────────────────────────
-      # Skipped silently when PSGALLERY_API_KEY secret is not configured.
-      # Add the secret in repo Settings → Secrets → Actions to activate.
       - name: Publish to PSGallery
         env:
           PSGALLERY_API_KEY: ${{ secrets.PSGALLERY_API_KEY }}
         shell: pwsh
         run: |
-          Write-Host "Publishing PASM ${{ steps.tag.outputs.version }} to PSGallery..." -ForegroundColor Cyan
-          Publish-Module -Path './build/PASM' -NuGetApiKey $env:PSGALLERY_API_KEY -Repository PSGallery
+          Write-Host "Publishing PSASM ${{ steps.tag.outputs.version }} to PSGallery..." -ForegroundColor Cyan
+          Publish-Module -Path './build/PSASM' -NuGetApiKey $env:PSGALLERY_API_KEY -Repository PSGallery
           Write-Host "✅ Published to PSGallery" -ForegroundColor Green
 
       # ── 10. Create GitHub Release ──────────────────────────────────────────
@@ -249,11 +244,11 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name:   ${{ steps.tag.outputs.tag }}
-          name:       ${{ steps.tag.outputs.tag }} Release of PASM
+          name:       ${{ steps.tag.outputs.tag }} Release of PSASM
           prerelease: ${{ steps.tag.outputs.is_prerelease }}
           files:      ${{ steps.zip.outputs.zip_path }}
           body: |
-            ## PASM ${{ steps.tag.outputs.tag }}
+            ## PSASM ${{ steps.tag.outputs.tag }}
 
             **Build date:** ${{ steps.version.outputs.build_date }}
             **Tests:** ${{ steps.pester.outputs.tests_passed }} passed / ${{ steps.pester.outputs.tests_failed }} failed / ${{ steps.pester.outputs.tests_total }} total
@@ -261,14 +256,14 @@ jobs:
             ### Install from PSGallery
             ```powershell
             # Stable
-            Install-Module PASM
+            Install-Module PSASM
 
             # Pre-release
-            Install-Module PASM -AllowPrerelease
+            Install-Module PSASM -AllowPrerelease
             ```
 
             ### Install from this release
-            Download `PASM-${{ steps.tag.outputs.full_version }}.zip`, extract, then:
+            Download `PSASM-${{ steps.tag.outputs.full_version }}.zip`, extract, then:
             ```powershell
-            Import-Module .\PASM\PASM.psm1
+            Import-Module .\PSASM\PSASM.psm1
             ```

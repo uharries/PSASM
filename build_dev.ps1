@@ -1,12 +1,12 @@
 # Using module PSScriptAnalyzer
 
 param(
-	[string]$ModuleName = 'PASM',
+	[string]$ModuleName = 'PSASM',
 	[switch]$debug
 )
 write-host "DEBUG: $debug"
 $SourcePath = Join-Path -Path (Resolve-Path ./src) -ChildPath $ModuleName
-$ModulePath = (Resolve-Path(Join-Path -Path $SourcePath -ChildPath "$ModuleName.psm1")).Path
+$ModulePath = (Resolve-Path(Join-Path -Path $SourcePath -ChildPath "$ModuleName.psd1")).Path
 
 # Define modules and minimum required versions
 $Modules = @{
@@ -82,19 +82,19 @@ if (-not $debug) {
 }
 
 if (get-module $ModuleName) {
-	$macros = Get-PASMFunction -ListMacros
+	$macros = Get-PSASMFunction -ListMacros
 	if ($macros) {
 		$macros | %{if (Test-Path "Function:\$_") { Remove-Item "Function:\$_" -Force }}
 	}
 }
 Remove-Module $ModuleName -Force -ErrorAction SilentlyContinue
-Import-Module $ModulePath -Force -Verbose
+Import-Module $ModulePath -Force #-Verbose
 
-# Have to do this after building, as Get-PASMFunction needs the module loaded
+# Have to do this after building, as Get-PSASMFunction needs the module loaded
 # so build twice to update the list of directives in common.ps1
 $commonPath = (Resolve-Path(Join-Path -Path $SourcePath -ChildPath "globals/common.ps1")).Path
-$directives = "`$PASMFunctions = (`"$((Get-PASMFunction).Name -join '", "')`")"
-(Get-Content $commonPath) | ForEach-Object { if ($_ -match '^\$PASMFunctions\s*=') { $directives } else { $_ } } | Set-Content $commonPath -Force
+$directives = "`$PSASMFunctions = (`"$((Get-PSASMFunction).Name -join '", "')`")"
+(Get-Content $commonPath) | ForEach-Object { if ($_ -match '^\$PSASMFunctions\s*=') { $directives } else { $_ } } | Set-Content $commonPath -Force
 
 
 Write-Host "✅ Development module loaded from: $SourcePath" -ForegroundColor Cyan
