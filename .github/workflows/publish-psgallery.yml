@@ -1,0 +1,50 @@
+name: Publish to PSGallery
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to publish (e.g. v1.4.0 or v1.4.0-beta.1)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish to PSGallery
+    runs-on: windows-latest
+
+    steps:
+
+      - name: Download release asset
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag     = '${{ inputs.tag }}'
+          $bare    = $tag -replace '^v', ''
+          $zipName = "PSASM-$bare.zip"
+
+          Write-Host "Downloading $zipName from release $tag..." -ForegroundColor Cyan
+          gh release download $tag --pattern $zipName --dir ./build --repo ${{ github.repository }}
+          Write-Host "✅ Downloaded: ./build/$zipName" -ForegroundColor Green
+
+          "zip_path=./build/$zipName" >> $env:GITHUB_OUTPUT
+        id: download
+
+      - name: Extract artifact
+        shell: pwsh
+        run: |
+          Expand-Archive -Path '${{ steps.download.outputs.zip_path }}' -DestinationPath './build' -Force
+          Write-Host "✅ Extracted to ./build/PSASM" -ForegroundColor Green
+
+      - name: Publish to PSGallery
+        shell: pwsh
+        env:
+          PSGALLERY_API_KEY: ${{ secrets.PSGALLERY_API_KEY }}
+        run: |
+          Write-Host "Publishing PSASM ${{ inputs.tag }} to PSGallery..." -ForegroundColor Cyan
+          Publish-Module -Path './build/PSASM' -NuGetApiKey $env:PSGALLERY_API_KEY -Repository PSGallery
+          Write-Host "✅ Published to PSGallery" -ForegroundColor Green

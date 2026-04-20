@@ -11,6 +11,7 @@
 #   Pre-release/prev:   git tag v1.4.0-preview.2 && git push --tags
 #
 # Secrets required (repo Settings → Secrets → Actions): PSGALLERY_API_KEY
+# Secrets required (repo Settings → Secrets → Actions): PSASM_SIGNING_KEY
 #
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -229,24 +230,74 @@ jobs:
           "zip_path=$zipPath" >> $env:GITHUB_OUTPUT
           "zip_name=$zipName" >> $env:GITHUB_OUTPUT
 
-      # ── 9. Publish to PSGallery ────────────────────────────────────────────
-      - name: Publish to PSGallery
-        env:
-          PSGALLERY_API_KEY: ${{ secrets.PSGALLERY_API_KEY }}
+      # ── 9. Compute SHA-256 checksum ────────────────────────────────────────
+      - name: Compute SHA-256 checksum
+        id: checksum
         shell: pwsh
         run: |
-          Write-Host "Publishing PSASM ${{ steps.tag.outputs.version }} to PSGallery..." -ForegroundColor Cyan
-          Publish-Module -Path './build/PSASM' -NuGetApiKey $env:PSGALLERY_API_KEY -Repository PSGallery
-          Write-Host "✅ Published to PSGallery" -ForegroundColor Green
+          $zipPath  = '${{ steps.zip.outputs.zip_path }}'
+          $hashFile = "$zipPath.sha256"
 
-      # ── 10. Create GitHub Release ──────────────────────────────────────────
+          $hash = (Get-FileHash -Path $zipPath -Algorithm SHA256).Hash.ToLower()
+          "$hash  $([System.IO.Path]::GetFileName($zipPath))" |
+            Set-Content $hashFile -Encoding ASCII -Force
+
+          Write-Host "SHA-256: $hash" -ForegroundColor Cyan
+          "hash=$hash"                                                  >> $env:GITHUB_OUTPUT
+          "hash_file=$hashFile"                                         >> $env:GITHUB_OUTPUT
+
+      # ── 10. Sign hash with Ed25519 private key ─────────────────────────────
+      # Signs the SHA-256 hex string using an Ed25519 key stored as a secret.
+      # The matching public key is hardcoded in the VS Code extension — no
+      # external CA, no Sigstore, no tooling required on the consumer side.
+      - name: Sign release artifact
+        id: sign
+        env:
+          PSASM_SIGNING_KEY: ${{ secrets.PSASM_SIGNING_KEY }}
+        shell: pwsh
+        run: |
+          $zipPath  = '${{ steps.zip.outputs.zip_path }}'
+          $hash     = '${{ steps.checksum.outputs.hash }}'
+          $sigFile  = "$zipPath.sha256.sig"
+          $keyFile  = './psasm_signing_key.pem'
+          $hashFile = '${{ steps.checksum.outputs.hash_file }}'
+
+          try {
+            # Write private key and hash bytes to temp files
+            $env:PSASM_SIGNING_KEY | Set-Content $keyFile -Encoding ASCII -Force
+            [System.IO.File]::WriteAllBytes(
+              $hashFile,
+              [System.Text.Encoding]::ASCII.GetBytes($hash)
+            )
+
+            # Sign: Ed25519 with -rawin (signs the raw bytes, no pre-hashing)
+            $sigBin = './sig.bin'
+            & openssl pkeyutl -sign -inkey $keyFile -rawin -in $hashFile -out $sigBin
+            if ($LASTEXITCODE -ne 0) { throw "openssl signing failed (exit $LASTEXITCODE)" }
+
+            # Base64-encode into the .sig file
+            $sigB64 = [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($sigBin))
+            $sigB64 | Set-Content $sigFile -Encoding ASCII -Force
+
+            Write-Host "✅ Signature written to: $sigFile" -ForegroundColor Green
+            "sig_file=$sigFile"   >> $env:GITHUB_OUTPUT
+
+          } finally {
+            # Always scrub key material, even on failure
+            Remove-Item $keyFile, $hashFile, $sigBin -Force -ErrorAction SilentlyContinue
+          }
+
+      # ── 11. Create GitHub Release ──────────────────────────────────────────
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name:   ${{ steps.tag.outputs.tag }}
-          name:       ${{ steps.tag.outputs.tag }} Release of PSASM
+          name:       Release ${{ steps.tag.outputs.tag }} of PSASM
           prerelease: ${{ steps.tag.outputs.is_prerelease }}
-          files:      ${{ steps.zip.outputs.zip_path }}
+          files: |
+            ${{ steps.zip.outputs.zip_path }}
+            ${{ steps.checksum.outputs.hash_file }}
+            ${{ steps.sign.outputs.sig_file }}
           body: |
             ## PSASM ${{ steps.tag.outputs.tag }}
 
