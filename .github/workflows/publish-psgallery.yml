@@ -1,3 +1,4 @@
+# Secrets required (repo Settings → Secrets → Actions): PSGALLERY_API_KEY
 name: Publish to PSGallery
 
 on:

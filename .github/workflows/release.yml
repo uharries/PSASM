@@ -10,7 +10,6 @@
 #   Pre-release/beta:   git tag v1.4.0-beta.1    && git push --tags
 #   Pre-release/prev:   git tag v1.4.0-preview.2 && git push --tags
 #
-# Secrets required (repo Settings → Secrets → Actions): PSGALLERY_API_KEY
 # Secrets required (repo Settings → Secrets → Actions): PSASM_SIGNING_KEY
 #
 # ─────────────────────────────────────────────────────────────────────────────
@@ -230,26 +229,7 @@ jobs:
           "zip_path=$zipPath" >> $env:GITHUB_OUTPUT
           "zip_name=$zipName" >> $env:GITHUB_OUTPUT
 
-      # ── 9. Compute SHA-256 checksum ────────────────────────────────────────
-      - name: Compute SHA-256 checksum
-        id: checksum
-        shell: pwsh
-        run: |
-          $zipPath  = '${{ steps.zip.outputs.zip_path }}'
-          $hashFile = "$zipPath.sha256"
-
-          $hash = (Get-FileHash -Path $zipPath -Algorithm SHA256).Hash.ToLower()
-          "$hash  $([System.IO.Path]::GetFileName($zipPath))" |
-            Set-Content $hashFile -Encoding ASCII -Force
-
-          Write-Host "SHA-256: $hash" -ForegroundColor Cyan
-          "hash=$hash"                                                  >> $env:GITHUB_OUTPUT
-          "hash_file=$hashFile"                                         >> $env:GITHUB_OUTPUT
-
-      # ── 10. Sign hash with Ed25519 private key ─────────────────────────────
-      # Signs the SHA-256 hex string using an Ed25519 key stored as a secret.
-      # The matching public key is hardcoded in the VS Code extension — no
-      # external CA, no Sigstore, no tooling required on the consumer side.
+      # ── 9. Sign zip file with Ed25519 private key ────────────────────────
       - name: Sign release artifact
         id: sign
         env:
@@ -257,35 +237,43 @@ jobs:
         shell: pwsh
         run: |
           $zipPath  = '${{ steps.zip.outputs.zip_path }}'
-          $hash     = '${{ steps.checksum.outputs.hash }}'
-          $sigFile  = "$zipPath.sha256.sig"
+          $sigFile  = "$zipPath.sig"
           $keyFile  = './psasm_signing_key.pem'
-          $hashFile = '${{ steps.checksum.outputs.hash_file }}'
 
           try {
-            # Write private key and hash bytes to temp files
+            # Write private key to temp file
             $env:PSASM_SIGNING_KEY | Set-Content $keyFile -Encoding ASCII -Force
-            [System.IO.File]::WriteAllBytes(
-              $hashFile,
-              [System.Text.Encoding]::ASCII.GetBytes($hash)
-            )
 
             # Sign: Ed25519 with -rawin (signs the raw bytes, no pre-hashing)
-            $sigBin = './sig.bin'
-            & openssl pkeyutl -sign -inkey $keyFile -rawin -in $hashFile -out $sigBin
+            & openssl pkeyutl -sign -inkey $keyFile -rawin -in $zipPath -out $sigFile
             if ($LASTEXITCODE -ne 0) { throw "openssl signing failed (exit $LASTEXITCODE)" }
-
-            # Base64-encode into the .sig file
-            $sigB64 = [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($sigBin))
-            $sigB64 | Set-Content $sigFile -Encoding ASCII -Force
 
             Write-Host "✅ Signature written to: $sigFile" -ForegroundColor Green
             "sig_file=$sigFile"   >> $env:GITHUB_OUTPUT
 
           } finally {
             # Always scrub key material, even on failure
-            Remove-Item $keyFile, $hashFile, $sigBin -Force -ErrorAction SilentlyContinue
+            Remove-Item $keyFile -Force -ErrorAction SilentlyContinue
           }
+
+      # ── 10. Compute public key fingerprint ───────────────────────────────
+      - name: Compute public key fingerprint
+        id: fingerprint
+        shell: pwsh
+        run: |
+          $pubKeyPath = "./keys/release-signing.pub"
+
+          if (-not (Test-Path $pubKeyPath)) {
+            throw "Public key not found at $pubKeyPath"
+          }
+
+          $fp = openssl pkey -pubin -in $pubKeyPath -outform DER |
+                openssl dgst -sha256 |
+                ForEach-Object { ($_ -split '=')[1].Trim() }
+
+          Write-Host "Fingerprint: $fp" -ForegroundColor Cyan
+
+          "fingerprint=$fp" >> $env:GITHUB_OUTPUT
 
       # ── 11. Create GitHub Release ──────────────────────────────────────────
       - name: Create GitHub Release
@@ -296,7 +284,6 @@ jobs:
           prerelease: ${{ steps.tag.outputs.is_prerelease }}
           files: |
             ${{ steps.zip.outputs.zip_path }}
-            ${{ steps.checksum.outputs.hash_file }}
             ${{ steps.sign.outputs.sig_file }}
           body: |
             ## PSASM ${{ steps.tag.outputs.tag }}
@@ -318,3 +305,10 @@ jobs:
             ```powershell
             Import-Module .\PSASM\PSASM.psm1
             ```
+
+            ### 🔐Release Verification
+
+            Fingerprint (SHA-256): `${{ steps.fingerprint.outputs.fingerprint }}`
+
+            For details, please see the [full verification guide](https://github.com/uharries/PSASM/blob/main/keys/README.md)
+
