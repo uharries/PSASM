@@ -1,6 +1,5 @@
 function .fill {
 	[PSASM()] param (
-		[ValidateRange(1,[int]::MaxValue)]
 		[int]$count,
 		[scriptblock]$data,
 		[string]$InvocationFile,
