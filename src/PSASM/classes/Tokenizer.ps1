@@ -5,6 +5,7 @@ class Tokenizer {
 	[int]$tokenStart
 	[int]$tline
 	[int]$tcolumn
+	[int]$tfileid
 	[string]$tfile
 	[System.Collections.Generic.List[Object]]$tokens # Apparently the <T> needs to be Object, if the type is custom - can be of custom type when the object is initialized
 	[System.Collections.Generic.Stack[int]]$ScopeStack
@@ -79,6 +80,7 @@ class Tokenizer {
 	}
 
 	[void] UnGetChar() {
+		if ($this.PeekChar() -eq 0) { return }	# Don't UnGet if EOF
 		if ($this.cpos -gt 0) {
 			$this.FileStack.UnReadChar()
 			$this.cpos--
@@ -95,6 +97,7 @@ class Tokenizer {
 			($this.cpos - $this.tokenStart),
 			$this.tline,
 			$this.tcolumn,
+			$this.tfileid,
 			$this.tfile
 		)
 
@@ -301,6 +304,7 @@ class Tokenizer {
 		$ctx = $this.FileStack.CurrentContext()
 		$this.tline = $ctx.Line
 		$this.tcolumn = $ctx.Column
+		$this.tfileid = $ctx.Id
 		$this.tfile = $ctx.File
 		[char]$c = $this.GetChar()
 		switch($c) {

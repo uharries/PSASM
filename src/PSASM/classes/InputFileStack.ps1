@@ -1,7 +1,14 @@
 class InputFileStack {
-	[System.Collections.Generic.List[InputFileContext]]$AllContexts = [System.Collections.Generic.List[InputFileContext]]::new()
-	[System.Collections.Generic.Stack[Object]]$Stack = [System.Collections.Generic.Stack[InputFileContext]]::new()
-	[System.Collections.Generic.HashSet[string]]$IncludeOnceFiles = [System.Collections.Generic.HashSet[string]]::new()
+	[System.Collections.Generic.List[InputFileContext]]$AllContexts
+	[System.Collections.Generic.Stack[Object]]$Stack
+	[System.Collections.Generic.HashSet[string]]$IncludeOnceFiles
+
+	InputFileStack() {
+		$this.AllContexts = [System.Collections.Generic.List[InputFileContext]]::new()
+		$this.Stack = [System.Collections.Generic.Stack[InputFileContext]]::new()
+		$this.IncludeOnceFiles = [System.Collections.Generic.HashSet[string]]::new()
+		[InputFileContext]::NextId = 0
+	}
 
 	[bool] IsRootedPath([string]$path) {
 		# Doing this with native PS and/or .net methods is surprisingly hard.
@@ -96,7 +103,7 @@ class InputFileStack {
 	[object] CurrentContext() {
 		if ($this.Stack.Count -eq 0) { return $null }
 		$ctx = $this.Stack.Peek()
-		return @{ File=$ctx.FilePath; Line=$ctx.Line; Column=$ctx.Column }
+		return @{ File=$ctx.FilePath; Id=$ctx.Id; Line=$ctx.Line; Column=$ctx.Column }
 	}
 
 	[void] AddIncludeDir([string]$path) {

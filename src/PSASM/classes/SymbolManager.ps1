@@ -2,6 +2,7 @@ class SymbolManager {
 	[hashtable]$Symbols = [ordered]@{}	### $Symbols[$Pass][$Scope][$Name][$Instance].Property
 	[int]$CurrentPass
 	[Scope[]]$scopes
+	[hashtable]$definitions = @{}
 
 	[void] SetSymbol([SymbolEntry]$symbol) {
 		# Write-Host "SetSymbol(symbol={name=$($symbol.Name), scopeId=$($symbol.ScopeId), pass=$($symbol.Pass), value=$($symbol.Value)})" -ForegroundColor Magenta
@@ -36,10 +37,24 @@ class SymbolManager {
 		$this.SetSymbol($sym)
 	}
 
-	[void] AddUnresolvedSymbol([string]$name, [string]$scopeId, [int]$line, [int]$column) {
+	[void] AddUnresolvedSymbol([string]$name, [string]$scopeId, [string]$filename, [int]$line, [int]$column) {
+		$key = "$name|$scopeId"
+
+		if ($this.definitions[$key]) {
+			throw "Symbol '$name' already defined in scope at $($this.definitions[$key].Filename):$($this.definitions[$key].Line):$($this.definitions[$key].Column). Cannot redefine at $($filename):$($line):$($column)"
+			return
+		}
+
+		$this.definitions[$key] = @{
+			Filename = $filename
+			Line     = $line
+			Column   = $column
+		}
+
 		$sym = [SymbolEntry]::new()
 		$sym.Name = $name
 		$sym.ScopeId = $scopeId
+		$sym.Filename = $filename
 		$sym.Line = $line
 		$sym.Column = $column
 		$this.SetSymbol($sym)
@@ -165,11 +180,18 @@ class SymbolManager {
 	[object[]] GetSymbolTable() {
 		$table = foreach ($scopeId in $this.Symbols[$this.CurrentPass].Keys) {
 			foreach ($name in $this.Symbols[$this.CurrentPass][$scopeId].Keys) {
-				$sym = $this.Symbols[$this.CurrentPass][$scopeId][$name][-1]
-				[pscustomobject]@{
-					Scope    = $scopeId
-					Name     = $name
-					Value    = $sym.value
+				for ($instance=0; $instance -lt $this.Symbols[$this.CurrentPass][$scopeId][$name].Count; $instance++) {
+					$sym = $this.Symbols[$this.CurrentPass][$scopeId][$name][$instance]
+					[pscustomobject]@{
+						Scope    = $scopeId
+						Name     = $name
+						Instance = $instance
+						Value    = $sym.value
+						Width    = $sym.Width
+						Filename = $sym.Filename
+						Line     = $sym.Line
+						Column   = $sym.Column
+					}
 				}
 			}
 		}

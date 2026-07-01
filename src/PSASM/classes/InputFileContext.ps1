@@ -1,4 +1,6 @@
 class InputFileContext {
+    static [int]$NextId = 0
+    [int]   $Id
     [string]$FilePath
     [string]$Content
     [int]   $Index    = 0
@@ -11,6 +13,7 @@ class InputFileContext {
     [bool]$IncludeOnce = $false
 
     InputFileContext([string]$resolvedPath) {
+        $this.Id = [InputFileContext]::NextId++
         $this.FilePath = $resolvedPath
         $this.Content  = (Get-Content -Path $resolvedPath -Raw)
 		# 					-replace "`r`n", "`n" `
@@ -23,6 +26,7 @@ class InputFileContext {
     }
 
     InputFileContext([string]$filename, [string]$content) {
+        $this.Id = [InputFileContext]::NextId++
         $this.FilePath = $filename
         $this.Content  = $content
         $this.Length   = $content.Length
