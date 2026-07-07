@@ -293,7 +293,7 @@ class SemanticParser {
 				if (-not $this.IsPrevToken($tokenIndex, [TokenType]::ColonColon)) {
 					# Check if next token is '=' (assignment) - if so, convert to .label call
 					if ($this.IsNextToken($ti, [TokenType]::Equals)) {
-						# $this.symbolManager.AddUnresolvedSymbol($tval, $this.scopeManager.GetCurrentScope(), $token.Filename, $token.Line, $token.Column)
+						$this.symbolManager.AddUnresolvedSymbol($tval, $this.scopeManager.GetCurrentScope(), $token.Filename, $token.Line, $token.Column)
 						$this.AddToken(".label -name $tval -scopeId $($this.scopeManager.GetCurrentScope()) -addr (")
 						# Skip the Equal sign
 						$ti = $this.SkipToNextToken($ti, [TokenType]::Equals)
