@@ -153,6 +153,11 @@ Describe 'Invoke-Assembler Function' {
 			@{ code = '.org $1000;lda :#12;inc :-'; binary = @(0x00,0x10,0xa9,0x0c,0xee,0x01,0x10)}
 			@{ code = '.org $1000;lda #12;inc *-1'; binary = @(0x00,0x10,0xa9,0x0c,0xee,0x01,0x10)}
 
+			# Constant assignment and usage
+			@{ code = 'lab1 = $10; lab2 = lab1 + $100; lda lab1; lda lab2'; binary = @(0x00,0x00,0xa5,0x10,0xad,0x10,0x01)}
+			# the same, but with fwd references, which should be resolved correctly
+			@{ code = 'lda lab1; lda lab2;lab2 = lab1 + $100; lab1 = $10'; binary = @(0x00,0x00,0xa5,0x10,0xad,0x10,0x01)}
+
 			@{ code = 'bne :+;:'; binary = @(0,0,0xd0,0x00)}
 			### Again, I choose not to support this.. labels should be labels, even if they are conflicting with mnemonics
 			# @{ code = 'bne:+;:'; binary = @(0,0,0xd0,0x00)}

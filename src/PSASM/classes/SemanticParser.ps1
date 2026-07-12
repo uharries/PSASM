@@ -227,7 +227,14 @@ class SemanticParser {
 		        ([TokenType]::AnonymousReference) {
 					# $this.symbolManager.AddUnresolvedSymbol($token.Value, $scopeId, $token.Filename, $token.Line, $token.Column)
 		        }
-		    }
+		        ([TokenType]::Identifier) {
+					# Check if previous token is NOT '::' (member access) and if next token is '=' (assignment)
+					# if so, we treat it as a label and add it to the symboltable to enable forward references
+					if (-not $this.IsPrevToken($tokenIndex, [TokenType]::ColonColon) -and $this.IsNextToken($tokenindex, [TokenType]::Equals)) {
+						$this.symbolManager.AddUnresolvedSymbol($token.Value, $scopeId, $token.Filename, $token.Line, $token.Column)
+					}
+		        }
+			}
 		}
 	}
 
@@ -293,8 +300,15 @@ class SemanticParser {
 				if (-not $this.IsPrevToken($tokenIndex, [TokenType]::ColonColon)) {
 					# Check if next token is '=' (assignment) - if so, convert to .label call
 					if ($this.IsNextToken($ti, [TokenType]::Equals)) {
-						$this.symbolManager.AddUnresolvedSymbol($tval, $this.scopeManager.GetCurrentScope(), $token.Filename, $token.Line, $token.Column)
-						$this.AddToken(".label -name $tval -scopeId $($this.scopeManager.GetCurrentScope()) -addr (")
+						# $this.symbolManager.AddUnresolvedSymbol($tval, $this.scopeManager.GetCurrentScope(), $token.Filename, $token.Line, $token.Column)
+
+						$sym = $this.symbolManager.ResolveNameAndScope($tval, $this.scopeManager.GetCurrentScope())
+						if ($sym.Resolved) {
+							$this.AddToken(".label -name $($sym.Name) -scopeId $($sym.ScopeId) -addr (")
+						} else {
+							throw "Unresolved symbol '$tval' at line $($token.Line), column $($token.Column). Name and Scope could not be resolved."
+						}
+
 						# Skip the Equal sign
 						$ti = $this.SkipToNextToken($ti, [TokenType]::Equals)
 						# Parse nested expression until semicolon or newline
