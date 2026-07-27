@@ -188,9 +188,13 @@ Describe 'Invoke-Assembler Function' {
 			@{ code = '.mac mac($x) {lda #$x;};mac(2);mac (4)'; binary = @(0,0,0xa9,2,0xa9,4)}
 			@{ code = '.mac mac() {nop;};mac;mac();mac ();mac(  );mac ( )'; binary = @(0,0,0xea,0xea,0xea,0xea,0xea)}
 			@{ code = 'class c{c(){}}'; binary = @(0,0)}	# ensure @() patch does not apply to classes
+			@{ code = '.fill 0 { 0xea }'; binary = @(0,0)}
+			@{ code = '.fill 1 { 0xea }'; binary = @(0,0,0xea)}
 			@{ code = '.fill 5 { $_ * 2 }'; binary = @(0,0,0,2,4,6,8)}
 			@{ code = '.repeat 5 { nop }'; binary = @(0,0,0xea,0xea,0xea,0xea,0xea)}
 			@{ code = '.org $09f8; .align 256 $ab; nop'; binary = @(0xf8,0x09,0xab,0xab,0xab,0xab,0xab,0xab,0xab,0xab,0xea)}
+			@{ code = '.org $01ff;.align 256;nop'; binary = @(0xff,0x01,0,0xea)}
+			@{ code = '.org $0100;.align 256;nop'; binary = @(0x00,0x01,0xea)}
 		) {
 			($code | Invoke-Assembler -NoHostOutput).Binary | Should -Be $binary
 		}
