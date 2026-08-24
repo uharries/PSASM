@@ -147,8 +147,9 @@ class SymbolManager {
 			# --- Qualified lookup ---
 			# Start by finding matching top-level scope
 			while ($true) {
-				$match = $this.scopes.Where({$_.ParentId -eq $this.scopes[$scopeId].ParentId -and $_.Name -eq $names[0]})
-				if ($match) { $scopeId = $match.Id; break }
+				# $match = $this.scopes.Where({$_.ParentId -eq $this.scopes[$scopeId].ParentId -and $_.Name -eq $names[0]})
+				$match = $this.scopes.Where({$_.ParentId -eq $scopeId -and $_.Name -eq $names[0]})
+				if ($match.count -gt 0) { $scopeId = $match[0].Id; break }
 				if ($scopeId -eq $this.scopes[$scopeId].ParentId) { break } # Reached root
 				$scopeId = $this.scopes[$scopeId].ParentId
 			}

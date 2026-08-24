@@ -219,6 +219,26 @@ Describe 'Invoke-Assembler Function' {
 			@{ code = '.macro mac($addr=mac.end) {lda $addr;end:}; mac'; binary = @(0,0,0xa5,2)}
 			@{ code = '.macro hest(){nop;lab:};hest;lda hest.lab'; binary = @(0,0,0xea,0xa5,1)}
 			@{ code = 'lab:{lab2=123;};lda lab.lab2'; binary = @(0,0,0xa5,0x7b)}
+			@{ code = @'
+Plasma: {
+	lda	Colors
+
+	for ($i=0;$i -lt 2;$i++) {
+		write-host "hh"
+	}
+
+	myfor:for ($i=0;$i -lt 2;$i++) {
+		lab:
+		write-host "hh"
+	}
+
+	lda	myfor.lab
+
+	Colors:
+		.byte	11
+}
+'@
+			; binary = @(0,0,0xa5,0x04,0xa5,0x02,0x0b)}
 		) {
 			($code | Invoke-Assembler -NoHostOutput).Binary | Should -Be $binary
 		}
@@ -246,6 +266,31 @@ lda #>MySpace.someData
 MySpace.noop(MySpace.ConstValue)
 '@
 			; binary = @(0,0x20,1,2,3,4,5,0xad,0,0x20,0xa9,0,0xa9,0x20,0xea,0xea,0xea,0xea,0xea,0xea,0xea,0xea,0xea,0xea)}
+
+			) {
+			($code | Invoke-Assembler -NoHostOutput).Binary | Should -Be $binary
+		}
+
+		It 'Should allow class type names and labels with same name and not use class names for named scopes' -TestCases @(
+			@{ code = @'
+class abc {
+	hidden abc() {}
+
+	static [abc] Method() {
+		return [abc]::new()
+	}
+}
+
+	jsr	abc.lab
+
+abc: {
+	lab: {
+		nop
+		rts
+	}
+}
+'@
+			; binary = @(0,0,0x20,0x03,0x00,0xea,0x60)}
 
 			) {
 			($code | Invoke-Assembler -NoHostOutput).Binary | Should -Be $binary

@@ -45,6 +45,11 @@ class SemanticParser {
 		return $tokenIndex
 	}
 
+	[int] SkipWhitespaceAndNewlineBackwards([int]$tokenIndex) {
+		while($this.inTokens[$tokenIndex].Type -in @([TokenType]::WhiteSpace, [TokenType]::Newline)) {$tokenIndex--}
+		return $tokenIndex
+	}
+
 	[bool] IsNextToken([int]$tokenIndex, [TokenType]$tokenType) {
 		$i = $this.SkipWhitespace($tokenIndex + 1)
 		return $this.inTokens[$i].Type -eq $tokenType
@@ -179,8 +184,30 @@ class SemanticParser {
 			$token = $this.inTokens[$tokenIndex]
 			switch($token.Type) {
 				([TokenType]::LCurly) {
-					$matchedIndex = $this.LookBackForToken($tokenIndex, @([TokenType]::LCurly, [TokenType]::RCurly, [TokenType]::Pipe), @([TokenType]::Label, [TokenType]::AnonymousLabel, [TokenType]::Identifier, [TokenType]::PSClassMethod), $true)
+					$matchedIndex = $this.LookBackForToken($tokenIndex, @([TokenType]::LCurly, [TokenType]::RCurly, [TokenType]::Pipe), @([TokenType]::Label, [TokenType]::AnonymousLabel, [TokenType]::Identifier, [TokenType]::PSKeyword), $true)
 					if ($matchedIndex -ge 0) {
+						if ($this.inTokens[$matchedIndex].Type -eq [TokenType]::Identifier) {
+							$prevToken = $this.SkipWhitespaceBackwards($matchedIndex - 1)
+							if ($prevToken -ge 0 -and $this.inTokens[$prevToken].Type -eq [TokenType]::Directive -and $this.inTokens[$prevToken].Value -match '\.mac(ro)?') {
+								$this.scopeManager.EnterNewScope($this.inTokens[$matchedIndex].Value, $tokenIndex, $token.Line, $token.Column)
+								break
+							} elseif ($this.IsNextToken($matchedIndex, [TokenType]::Equals)) {
+								$this.scopeManager.EnterNewScope($this.inTokens[$matchedIndex].Value, $tokenIndex, $token.Line, $token.Column)
+								break
+							} else {
+								$this.scopeManager.EnterNewScope($tokenIndex, $token.Line, $token.Column)
+								break
+							}
+						}
+						if ($this.inTokens[$matchedIndex].Type -eq [TokenType]::PSKeyword) {
+							$prevToken = $this.SkipWhitespaceAndNewlineBackwards($matchedIndex - 1)
+							if ($prevToken -ge 0 -and ($this.inTokens[$prevToken].Type -in @([TokenType]::Label,[TokenType]::AnonymousLabel))) {
+								$this.scopeManager.EnterNewScope($this.inTokens[$prevToken].Value, $tokenIndex, $token.Line, $token.Column)
+							} else {
+								$this.scopeManager.EnterNewScope($tokenIndex, $token.Line, $token.Column)
+							}
+							break
+						}
 						$this.scopeManager.EnterNewScope($this.inTokens[$matchedIndex].Value, $tokenIndex, $token.Line, $token.Column)
 					} else {
 						$this.scopeManager.EnterNewScope($tokenIndex, $token.Line, $token.Column)
@@ -293,6 +320,18 @@ class SemanticParser {
 
 				if ($this.hashTableCounter.Counters[0] -gt 0 -and $this.hashTableCounter.Counters[1] -eq 1) {
 					# We're in a hashtable so identifier is a key, return as is and let PowerShell handle it
+					$this.AddToken($token.Value)
+					break
+				}
+
+				if ($this.IsPrevToken($tokenIndex, [TokenType]::PSKeyword)) {
+					# We're in a PowerShell keyword context, so identifier is a variable, type name or function name, return as is and let PowerShell handle it
+					$this.AddToken($token.Value)
+					break
+				}
+
+				if ($this.IsPrevToken($tokenIndex, [TokenType]::LBracket)) {
+					# We're in a PowerShell array or type reference context, return as is and let PowerShell handle it
 					$this.AddToken($token.Value)
 					break
 				}
