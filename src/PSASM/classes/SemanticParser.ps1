@@ -565,12 +565,14 @@ class SemanticParser {
 						{$tk.Value -eq 'x'} {
 							if($state -eq [state]::Indexed) {$state = [state]::IndexedX; break}
 							if($state -eq [state]::AbsoluteIndexed) {$state = [state]::AbsoluteIndexedX; break}
+							if($state -eq [state]::Init) {$state = [state]::Absolute}
 							$operandTokensIndex+=$i
 						}
 
 						{$tk.Value -eq 'y'} {
 							if($state -eq [state]::IndirectIndexed) {$state = [state]::IndirectIndexedY; break}
 							if($state -eq [state]::AbsoluteIndexed) {$state = [state]::AbsoluteIndexedY; break}
+							if($state -eq [state]::Init) {$state = [state]::Absolute}
 							$operandTokensIndex+=$i
 						}
 
