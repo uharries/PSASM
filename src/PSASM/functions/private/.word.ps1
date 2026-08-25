@@ -2,14 +2,14 @@ function .word {
 	[Alias('dc.w')]
 	[PSASM()] param (
 		[Parameter(Mandatory)]
-		[int[]]$values,
+		[object[]]$values,
 
 		[string]$InvocationFile,
 		[int]$InvocationLine
 	)
 
 	$normalized = foreach ($v in $values) {
-		[UInt16]($v -band 0xffff)
+		$v -is [Undefined] ? [UInt16]0 : [UInt16]($v -band 0xffff)
 	}
 
 	$psasm.DataAdd($normalized, $InvocationFile, $InvocationLine)

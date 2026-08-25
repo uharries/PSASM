@@ -183,6 +183,18 @@ Describe 'Invoke-Assembler Function' {
 		}
 	}
 
+	Context 'SymbolReferences' {
+		It 'Returns expected <binary> from <code>' -TestCases @(
+			@{ code = 'x=1;.byte x;x=2;.byte x'; binary = @(0,0,1,2)}
+			@{ code = 'x=1;x=2;.byte x'; binary = @(0,0,2)}
+			@{ code = '.byte x;x=1'; binary = @(0,0,1)}
+			@{ code = '.byte x;x=1;x=2'; binary = @(0,0,1)}
+			@{ code = '.byte x;x=1;.byte x;x=2'; binary = @(0,0,1,1)}
+		) {
+			($code | Invoke-Assembler -NoHostOutput).Binary | Should -Be $binary
+		}
+	}
+
 	Context 'Directives' {
 		It 'Returns expected <binary> from <code>' -TestCases @(
 			@{ code = '.mac mac($x) {lda #$x;};mac(2);mac (4)'; binary = @(0,0,0xa9,2,0xa9,4)}
@@ -224,12 +236,12 @@ Plasma: {
 	lda	Colors
 
 	for ($i=0;$i -lt 2;$i++) {
-		write-host "hh"
+		write-host "" -NoNewLine
 	}
 
 	myfor:for ($i=0;$i -lt 2;$i++) {
 		lab:
-		write-host "hh"
+		write-host "" -NoNewLine
 	}
 
 	lda	myfor.lab

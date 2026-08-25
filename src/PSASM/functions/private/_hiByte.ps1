@@ -2,9 +2,9 @@ function _hiByte {
 	[Alias('.hi')]
 	[PSASM()] param (
 		[Parameter(Mandatory)]
-		[int]$value
+		[object]$value
 	)
 
-	$v = $value -band 0xffff
-	return [byte]($v -shr 8)
+	$value = $value -is [Undefined] ? 0 : $value -band 0xffff
+	return [byte]($value -shr 8)
 }

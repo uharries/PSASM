@@ -22,6 +22,8 @@ function .inst {
 		throw "Unknown addressing mode '$AddressingMode' for mnemonic '$Mnemonic' at line $InvocationLine in file '$InvocationFile'."
 	}
 
+	$Operand = $Operand -is [Undefined] ? 0xdeadbea7 : $Operand
+
 	if($Operand -lt 256) {
 		switch ($AddressingMode) {
 			'Absolute' {

@@ -3,6 +3,7 @@ class SymbolManager {
 	[int]$CurrentPass
 	[Scope[]]$scopes
 	[hashtable]$definitions = @{}
+	[Undefined]$UndefinedValue = [Undefined]::new()
 
 	[void] SetSymbol([SymbolEntry]$symbol) {
 		# Write-Host "SetSymbol(symbol={name=$($symbol.Name), scopeId=$($symbol.ScopeId), pass=$($symbol.Pass), value=$($symbol.Value)})" -ForegroundColor Magenta
@@ -40,10 +41,10 @@ class SymbolManager {
 	[void] AddUnresolvedSymbol([string]$name, [string]$scopeId, [string]$filename, [int]$line, [int]$column) {
 		$key = "$name|$scopeId"
 
-		if ($this.definitions[$key]) {
-			throw "Symbol '$name' already defined in scope at $($this.definitions[$key].Filename):$($this.definitions[$key].Line):$($this.definitions[$key].Column). Cannot redefine at $($filename):$($line):$($column)"
-			return
-		}
+		# if ($this.definitions[$key]) {
+		# 	throw "Symbol '$name' already defined in scope at $($this.definitions[$key].Filename):$($this.definitions[$key].Line):$($this.definitions[$key].Column). Cannot redefine at $($filename):$($line):$($column)"
+		# 	return
+		# }
 
 		$this.definitions[$key] = @{
 			Filename = $filename
@@ -57,6 +58,7 @@ class SymbolManager {
 		$sym.Filename = $filename
 		$sym.Line = $line
 		$sym.Column = $column
+		$sym.Value = $this.UndefinedValue
 		$this.SetSymbol($sym)
 	}
 
