@@ -854,6 +854,46 @@ lab2: nop
 }
 
 
+Describe ".namespace" {
+
+    It "creates a named scope" {
+        $result = @'
+.namespace na {
+    value = 123
+}
+'@ | Invoke-Assembler -NoHostOutput
+
+        $result.Symbols.Where({ $_.FQName -eq 'na.value' }).Value | Should -Be 123
+    }
+
+    It "does not create a symbol for the namespace itself" {
+        $result = @'
+.namespace na {
+    value = 123
+}
+'@ | Invoke-Assembler -NoHostOutput
+
+    	$result.Symbols.Where({ $_.FQName -eq 'na' }) | Should -BeNullOrEmpty
+    }
+
+    It "allows symbols to be referenced using a qualified name" {
+        $result = @'
+.namespace na {
+    value = $42
+}
+
+.byte na.value
+'@ | Invoke-Assembler -NoHostOutput
+
+        $result.Binary | Should -Be @(0,0,0x42)
+    }
+
+	It "does not allow namespaces without a defined block" {
+        $result = '.namespace na' | Invoke-Assembler -NoHostOutput
+		$result.Success | Should -Be $false
+    }
+
+}
 
 AfterAll {
 }

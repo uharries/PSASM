@@ -188,7 +188,7 @@ class SemanticParser {
 					if ($matchedIndex -ge 0) {
 						if ($this.inTokens[$matchedIndex].Type -eq [TokenType]::Identifier) {
 							$prevToken = $this.SkipWhitespaceBackwards($matchedIndex - 1)
-							if ($prevToken -ge 0 -and $this.inTokens[$prevToken].Type -eq [TokenType]::Directive -and $this.inTokens[$prevToken].Value -match '\.mac(ro)?') {
+							if ($prevToken -ge 0 -and $this.inTokens[$prevToken].Type -eq [TokenType]::Directive -and $this.inTokens[$prevToken].Value -match '\.(mac(ro)?|namespace)') {
 								$this.scopeManager.EnterNewScope($this.inTokens[$matchedIndex].Value, $tokenIndex, $token.Line, $token.Column)
 								break
 							} elseif ($this.IsNextToken($matchedIndex, [TokenType]::Equals)) {
@@ -306,7 +306,15 @@ class SemanticParser {
 				if ($token.Value -in '.byte', '.word', '.text', '.txt', '.petscii', '.ascii', '.fill', '.align') {
 					$this.AddToken(" -InvocationFile '$($token.Filename)' -InvocationLine $($token.Line)")
 				}
-
+				if ($token.Value -match '\.namespace') {
+					$tokenIndex = $this.ParseUntilAfterNextToken($tokenIndex+1, [TokenType]::Identifier)
+					if ($this.IsNextToken($tokenIndex, [TokenType]::LCurly)) {
+						$nextTokenIndex = $this.SkipToNextToken($tokenIndex, [TokenType]::LCurly)
+						$this.AddToken(";&")
+					} else {
+						throw ".namespace directive at line $($token.Line), column $($token.Column) is missing block definition"
+					}
+				}
 			}
 
 			([TokenType]::Identifier) {
@@ -350,8 +358,18 @@ class SemanticParser {
 
 						# Skip the Equal sign
 						$ti = $this.SkipToNextToken($ti, [TokenType]::Equals)
+
+						if ($this.IsNextToken($ti, [TokenType]::LCurly)) {
+							$ti = $this.SkipToNextToken($ti, [TokenType]::LCurly)
+							$this.AddToken("0")
+							$this.AddToken(");")
+							$this.AddToken("&")
+							$nextTokenIndex = $ti
+							break
+						}
+
 						# Parse nested expression until semicolon or newline
-						$nextTokenIndex = $this.ParseUntilNextToken($ti, [TokenType[]]@([TokenType]::SemiColon, [TokenType]::NewLine))
+						$nextTokenIndex = $this.ParseUntilNextToken($ti, [TokenType[]]@([TokenType]::SemiColon, [TokenType]::NewLine, [TokenType]::RCurly))
 						$this.AddToken(");")
 						break
 					}

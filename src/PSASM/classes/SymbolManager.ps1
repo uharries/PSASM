@@ -180,14 +180,36 @@ class SymbolManager {
 		}
 	}
 
+
+	[string] GetFullyQualifiedName([string]$name, [int]$scopeId) {
+		$parts = [System.Collections.Generic.List[string]]::new()
+
+		$scope = $this.scopes[$scopeId]
+
+		while ($scope -and $scope.Id -ne 0) {
+			if ($scope.Name) {
+				$parts.Add($scope.Name)
+			}
+
+			$scope = $this.scopes[$scope.ParentId]
+		}
+
+		$parts.Reverse()
+		$parts.Add($name)
+
+		return $parts -join '.'
+	}
+
+
 	[object[]] GetSymbolTable() {
 		$table = foreach ($scopeId in $this.Symbols[$this.CurrentPass].Keys) {
 			foreach ($name in $this.Symbols[$this.CurrentPass][$scopeId].Keys) {
 				for ($instance=0; $instance -lt $this.Symbols[$this.CurrentPass][$scopeId][$name].Count; $instance++) {
 					$sym = $this.Symbols[$this.CurrentPass][$scopeId][$name][$instance]
 					[pscustomobject]@{
-						Scope    = $scopeId
+						FQName   = $this.GetFullyQualifiedName($name, [int]$scopeId)
 						Name     = $name
+						Scope    = $scopeId
 						Instance = $instance
 						Value    = $sym.value
 						Width    = $sym.Width
@@ -200,6 +222,7 @@ class SymbolManager {
 		}
 		return $table
 	}
+
 
 	[object[]] GetFullSymbolTable() {
 		$table = foreach ($pass in $this.Symbols.Keys) {

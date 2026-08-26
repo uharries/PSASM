@@ -11,7 +11,7 @@ $PSKeywords = ("begin","break","catch","class","clean","continue","data","define
 
 ### Use this to generate / update the list as new functions / directives are added:
 ### "`$PSASMFunctions = (`"$((Get-PSASMFunction).Name -join '", "')`")"
-$PSASMFunctions = (".ascii", ".hi", ".lab", ".lo", ".mac", ".petscii", ".rep", ".txt", "dc.b", "dc.w", ".align", ".byte", ".fill", ".include", ".includeonce", ".inst", ".label", ".macro", ".org", ".pc", ".popsegment", ".pushsegment", ".repeat", ".segment", ".text", ".word", "_getSymbol", "_hiByte", "_invokeMacro", "_loByte")
+$PSASMFunctions = (".ascii", ".hi", ".lab", ".lo", ".mac", ".petscii", ".rep", ".txt", "dc.b", "dc.w", ".align", ".byte", ".fill", ".include", ".includeonce", ".inst", ".label", ".macro", ".namespace", ".org", ".pc", ".popsegment", ".pushsegment", ".repeat", ".segment", ".text", ".word", "_getSymbol", "_hiByte", "_invokeMacro", "_loByte")
 
 
 class Undefined {
