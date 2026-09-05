@@ -191,7 +191,7 @@ class Assembler {
 	[AssemblyResult]ToResult() {
 		$info = [AssemblyResult]::new()
 		$info.LoadAddress  = $this.loadAddress
-		$info.Scopes       = $this.scopes
+		$info.Scopes       = $this.parser?.scopeManager?.GetScopeTable()
 		$info.Symbols      = $this.symbolManager?.GetSymbolTable()
 		$info.SymbolsFull  = $this.symbolManager?.GetFullSymbolTable()
 		$info.PSSource     = $this.PSSource

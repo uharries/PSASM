@@ -2,7 +2,7 @@ class AssemblyResult {
 	[bool]$Success
 	[string]$ErrorMessage
 	[UInt16]$LoadAddress
-	[Scope[]]$Scopes
+	[object[]]$Scopes
 	[object[]]$Symbols
 	[object[]]$SymbolsFull
 	[string]$PSSource

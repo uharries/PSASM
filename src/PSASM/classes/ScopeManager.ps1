@@ -83,5 +83,40 @@ class ScopeManager {
 		return $false
 	}
 
-}
+	[string] GetFullyQualifiedName([Scope]$scope) {
+		$parts = [System.Collections.Generic.List[string]]::new()
 
+		while ($scope -and $scope.Id -ne 0) {
+			if ($scope.Name) {
+				$parts.Add($scope.Name)
+			}
+
+			$scope = $this.scopes[$scope.ParentId]
+		}
+
+		$parts.Reverse()
+
+		return $parts -join '.'
+	}
+
+
+	[object[]] GetScopeTable() {
+		$table = foreach ($scope in $this.scopes) {
+			$obj = [pscustomobject]@{
+				FQName      = $this.GetFullyQualifiedName($scope)
+				Id          = $scope.Id
+				Name        = $scope.Name
+				ParentId    = $scope.ParentId
+				StartIndex  = $scope.StartIndex
+				EndIndex    = $scope.EndIndex
+				StartLine   = $scope.StartLine
+				StartColumn = $scope.StartColumn
+				EndLine     = $scope.EndLine
+				EndColumn   = $scope.EndColumn
+			}
+			$obj.PSObject.TypeNames.Insert(0, 'PSASM.Scope')
+			$obj
+		}
+		return $table
+	}
+}

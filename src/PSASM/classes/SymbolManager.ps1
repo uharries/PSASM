@@ -206,7 +206,7 @@ class SymbolManager {
 			foreach ($name in $this.Symbols[$this.CurrentPass][$scopeId].Keys) {
 				for ($instance=0; $instance -lt $this.Symbols[$this.CurrentPass][$scopeId][$name].Count; $instance++) {
 					$sym = $this.Symbols[$this.CurrentPass][$scopeId][$name][$instance]
-					[pscustomobject]@{
+					$obj = [pscustomobject]@{
 						FQName   = $this.GetFullyQualifiedName($name, [int]$scopeId)
 						Name     = $name
 						Scope    = $scopeId
@@ -217,6 +217,8 @@ class SymbolManager {
 						Line     = $sym.Line
 						Column   = $sym.Column
 					}
+					$obj.PSObject.TypeNames.Insert(0, 'PSASM.Symbol')
+					$obj
 				}
 			}
 		}
@@ -234,6 +236,7 @@ class SymbolManager {
 							Pass      = $pass
 							Scope     = $scope
 							Name      = $name
+							FQName    = $this.GetFullyQualifiedName($name, [int]$scope)
 							Instance  = $instance
 							SymName   = $symbol.Name
 							SymScope  = $symbol.ScopeId
