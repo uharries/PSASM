@@ -57,7 +57,7 @@ class Assembler {
 	}
 
 
-	[void]AddLine([byte[]]$bytes, [string]$invocationFile, [int]$invocationLine) {
+	[void]AddLine([byte[]]$bytes, [string]$invocationFile, [int]$invocationLine, [int]$invocationColumn) {
 
 		# Write-Host "`$invocation.Line: $($invocationLine)"
 		# Write-Host "File: $($invocationFile)"
@@ -70,7 +70,7 @@ class Assembler {
 			$this.Segments.Current.PC,
 			$bytes,
 			$invocationLine,
-			0,
+			$invocationColumn,
 			$this.SourceLines[$invocationFile]?[$invocationLine - 1] ?? "<null>",
 			"<no psSourceLine>",
 			$invocationFile
@@ -79,28 +79,28 @@ class Assembler {
 	}
 
 
-	[void]OpAdd([byte]$OpCode, [string]$invocationFile, [int]$invocationLine) {
-		$this.AddLine(@($OpCode), $invocationFile, $invocationLine)
+	[void]OpAdd([byte]$OpCode, [string]$invocationFile, [int]$invocationLine, [int]$invocationColumn) {
+		$this.AddLine(@($OpCode), $invocationFile, $invocationLine, $invocationColumn)
 	}
 
 
-	[void]OpAdd([byte]$OpCode, [byte]$Operand, [string]$invocationFile, [int]$invocationLine) {
-		$this.AddLine(@($OpCode,$Operand), $invocationFile, $invocationLine)
+	[void]OpAdd([byte]$OpCode, [byte]$Operand, [string]$invocationFile, [int]$invocationLine, [int]$invocationColumn) {
+		$this.AddLine(@($OpCode,$Operand), $invocationFile, $invocationLine, $invocationColumn)
 	}
 
 
-	[void]OpAdd([byte]$OpCode, [UInt16]$Operand, [string]$invocationFile, [int]$invocationLine) {
-		$this.AddLine(@($OpCode,(_loByte $Operand),(_hiByte $Operand)), $invocationFile, $invocationLine)
+	[void]OpAdd([byte]$OpCode, [UInt16]$Operand, [string]$invocationFile, [int]$invocationLine, [int]$invocationColumn) {
+		$this.AddLine(@($OpCode,(_loByte $Operand),(_hiByte $Operand)), $invocationFile, $invocationLine, $invocationColumn)
 	}
 
 
-	[void]DataAdd([byte[]]$data, [string]$invocationFile, [int]$invocationLine) {
-		$this.AddLine($data, $invocationFile, $invocationLine)
+	[void]DataAdd([byte[]]$data, [string]$invocationFile, [int]$invocationLine, [int]$invocationColumn) {
+		$this.AddLine($data, $invocationFile, $invocationLine, $invocationColumn)
 	}
 
 
-	[void]DataAdd([UInt16[]]$data, [string]$invocationFile, [int]$invocationLine) {
-		$this.AddLine([byte[]]($data | ForEach-Object{_loByte $_;_hiByte $_}), $invocationFile, $invocationLine)
+	[void]DataAdd([UInt16[]]$data, [string]$invocationFile, [int]$invocationLine, [int]$invocationColumn) {
+		$this.AddLine([byte[]]($data | ForEach-Object{_loByte $_;_hiByte $_}), $invocationFile, $invocationLine, $invocationColumn)
 	}
 
 

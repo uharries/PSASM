@@ -38,7 +38,7 @@ class SymbolManager {
 		$this.SetSymbol($sym)
 	}
 
-	[void] AddUnresolvedSymbol([string]$name, [string]$scopeId, [string]$filename, [int]$line, [int]$column) {
+	[void] AddUnresolvedSymbol([string]$name, [string]$scopeId, [SourceExtent]$extent) {
 		$key = "$name|$scopeId"
 
 		# if ($this.definitions[$key]) {
@@ -47,25 +47,25 @@ class SymbolManager {
 		# }
 
 		$this.definitions[$key] = @{
-			Filename = $filename
-			Line     = $line
-			Column   = $column
+			Filename = $extent.Filename
+			Line     = $extent.Line
+			Column   = $extent.Column
 		}
 
 		$sym = [SymbolEntry]::new()
 		$sym.Name = $name
 		$sym.ScopeId = $scopeId
-		$sym.Filename = $filename
-		$sym.Line = $line
-		$sym.Column = $column
+		$sym.Filename = $extent.Filename
+		$sym.Line = $extent.Line
+		$sym.Column = $extent.Column
 		$sym.Value = $this.UndefinedValue
 		$this.SetSymbol($sym)
 	}
 
-	[SymbolEntry] GetSymbol($name, [int]$callerScopeId, [int]$callerLine, [int]$callerColumn, [System.Management.Automation.InvocationInfo]$invocation) {
+	[SymbolEntry] GetSymbol($name, [int]$callerScopeId, [string]$callerFilename, [int]$callerLine, [int]$callerColumn, [System.Management.Automation.InvocationInfo]$invocation) {
 		$r = $this.ResolveNameAndScope($name, $callerScopeId)
 		if (-not $r.Resolved) {
-			throw "Unresolved symbol '$name'. Scope could not be resolved in line $($callerLine), column $($callerColumn)"
+			throw "Unresolved symbol '$name'. Scope could not be resolved at line $($callerLine), column $($callerColumn) in '$($callerFilename)'"
 		}
 		$name = $r.Name
 		$scopeId = $r.ScopeId
@@ -117,11 +117,11 @@ class SymbolManager {
 						return $this.Symbols[$previousPass][$scope][$name][0]
 					}
 				} else {
-					throw "Unresolved symbol in scope '$scope'. Symbol '$name' not found in line $($callerLine), column $($callerColumn)"
+					throw "Unresolved symbol in scope '$scope'. Symbol '$name' not found at line $($callerLine), column $($callerColumn) in '$($callerFilename)'"
 				}
 			} else {
 				# return [SymbolEntry]::new()
-				throw "Unresolved symbol '$name'. Scope '$scope' not found in line $($callerLine), column $($callerColumn)"
+				throw "Unresolved symbol '$name'. Scope '$scope' not found at line $($callerLine), column $($callerColumn) in '$($callerFilename)'"
 			}
 		} else {
 			throw "GetSymbol() called in pass 0. This should never happen!"

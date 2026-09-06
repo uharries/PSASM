@@ -15,11 +15,12 @@ function .inst {
 		[object]$Operand,
 
 		[string]$InvocationFile,
-		[int]$InvocationLine
+		[int]$InvocationLine,
+		[int]$InvocationColumn
 	)
 
 	if (-not [MOS6502]::opcodes.$Mnemonic.ContainsKey($AddressingMode)) {
-		throw "Unknown addressing mode '$AddressingMode' for mnemonic '$Mnemonic' at line $InvocationLine in file '$InvocationFile'."
+		throw "Unknown addressing mode '$AddressingMode' for mnemonic '$Mnemonic' at line $InvocationLine, column $InvocationColumn in '$InvocationFile'"
 	}
 
 	$Operand = $Operand -is [Undefined] ? 0xdeadbea7 : $Operand
@@ -49,12 +50,12 @@ function .inst {
 	}
 
 	if ([MOS6502]::OperandSize.$AddressingMode -eq 16) {
-		$psasm.OpAdd([MOS6502]::OpCodes.$Mnemonic.$AddressingMode, ($Operand -band 0xffff), $InvocationFile, $InvocationLine)
+		$psasm.OpAdd([MOS6502]::OpCodes.$Mnemonic.$AddressingMode, ($Operand -band 0xffff), $InvocationFile, $InvocationLine, $InvocationColumn)
 	}
 	if ([MOS6502]::OperandSize.$AddressingMode -eq 8) {
-		$psasm.OpAdd([MOS6502]::OpCodes.$Mnemonic.$AddressingMode, [byte]($Operand -band 0xff), $InvocationFile, $InvocationLine)
+		$psasm.OpAdd([MOS6502]::OpCodes.$Mnemonic.$AddressingMode, [byte]($Operand -band 0xff), $InvocationFile, $InvocationLine, $InvocationColumn)
 	}
 	if ([MOS6502]::OperandSize.$AddressingMode -eq 0) {
-		$psasm.OpAdd([MOS6502]::OpCodes.$Mnemonic.$AddressingMode, $InvocationFile, $InvocationLine)
+		$psasm.OpAdd([MOS6502]::OpCodes.$Mnemonic.$AddressingMode, $InvocationFile, $InvocationLine, $InvocationColumn)
 	}
 }

@@ -164,15 +164,15 @@ class SemanticParser {
 		### This updates the Value property of inTokens directly!
 		# Remove trailing : from labels and create unique names for anonymous labels
 		$labels = $this.inTokens.Where({$_.Type -eq [TokenType]::Label}).ForEach({$_.Value = $_.Value.Trim(':');$_})
-		$anonymousLabels = $this.inTokens.Where({$_.Type -eq [TokenType]::AnonymousLabel}).ForEach({$_.Value = "ANON_F$($_.FileId)_L$($_.Line)_C$($_.Column)";$_})
+		$anonymousLabels = $this.inTokens.Where({$_.Type -eq [TokenType]::AnonymousLabel}).ForEach({$_.Value = "ANON_F$($_.Extent.FileId)_L$($_.Extent.Line)_C$($_.Extent.Column)";$_})
 
 		# Resolve anonymous references to the corresponding anonymous labels
 		# This updates the Value property of the reference token to the resolved label name
 		$anonymousReferences = foreach($ref in $this.inTokens.Where({$_.Type -eq [TokenType]::AnonymousReference})) {
 			if($ref.Value[1] -eq '+') {
-				$r = ($anonymousLabels.Where({$_.Index -gt $ref.Index}) | Sort-Object -Property {$_.Index})[$ref.Length-2]
+				$r = ($anonymousLabels.Where({$_.Extent.Index -gt $ref.Extent.Index}) | Sort-Object -Property {$_.Extent.Index})[$ref.Extent.Length-2]
 			} else {
-				$r = ($anonymousLabels.Where({$_.Index -lt $ref.Index}) | Sort-Object -Descending -Property {$_.Index})[$ref.Length-2]
+				$r = ($anonymousLabels.Where({$_.Extent.Index -lt $ref.Extent.Index}) | Sort-Object -Descending -Property {$_.Extent.Index})[$ref.Extent.Length-2]
 			}
 			$ref.Value = $r.Value
 			$ref
@@ -189,37 +189,37 @@ class SemanticParser {
 						if ($this.inTokens[$matchedIndex].Type -eq [TokenType]::Identifier) {
 							$prevToken = $this.SkipWhitespaceBackwards($matchedIndex - 1)
 							if ($prevToken -ge 0 -and $this.inTokens[$prevToken].Type -eq [TokenType]::Directive -and $this.inTokens[$prevToken].Value -match '\.(mac(ro)?|namespace)') {
-								$this.scopeManager.EnterNewScope($this.inTokens[$matchedIndex].Value, $tokenIndex, $token.Line, $token.Column)
+								$this.scopeManager.EnterNewScope($this.inTokens[$matchedIndex].Value, $token.Extent)
 								break
 							} elseif ($this.IsNextToken($matchedIndex, [TokenType]::Equals)) {
-								$this.scopeManager.EnterNewScope($this.inTokens[$matchedIndex].Value, $tokenIndex, $token.Line, $token.Column)
+								$this.scopeManager.EnterNewScope($this.inTokens[$matchedIndex].Value, $token.Extent)
 								break
 							} else {
-								$this.scopeManager.EnterNewScope($tokenIndex, $token.Line, $token.Column)
+								$this.scopeManager.EnterNewScope($token.Extent)
 								break
 							}
 						}
 						if ($this.inTokens[$matchedIndex].Type -eq [TokenType]::PSKeyword) {
 							$prevToken = $this.SkipWhitespaceAndNewlineBackwards($matchedIndex - 1)
 							if ($prevToken -ge 0 -and ($this.inTokens[$prevToken].Type -in @([TokenType]::Label,[TokenType]::AnonymousLabel))) {
-								$this.scopeManager.EnterNewScope($this.inTokens[$prevToken].Value, $tokenIndex, $token.Line, $token.Column)
+								$this.scopeManager.EnterNewScope($this.inTokens[$prevToken].Value, $token.Extent)
 							} else {
-								$this.scopeManager.EnterNewScope($tokenIndex, $token.Line, $token.Column)
+								$this.scopeManager.EnterNewScope($token.Extent)
 							}
 							break
 						}
-						$this.scopeManager.EnterNewScope($this.inTokens[$matchedIndex].Value, $tokenIndex, $token.Line, $token.Column)
+						$this.scopeManager.EnterNewScope($this.inTokens[$matchedIndex].Value, $token.Extent)
 					} else {
-						$this.scopeManager.EnterNewScope($tokenIndex, $token.Line, $token.Column)
+						$this.scopeManager.EnterNewScope($token.Extent)
 					}
 				}
 
 				([TokenType]::RCurly) {
-					$this.scopeManager.ExitNewScope($tokenIndex, $token.Line, $token.Column)
+					$this.scopeManager.ExitNewScope($token.Extent)
 				}
 
 				([TokenType]::EOF) {
-					$this.scopeManager.ExitNewScope($tokenIndex, $token.Line, $token.Column)
+					$this.scopeManager.ExitNewScope($token.Extent)
 				}
 			}
 		}
@@ -232,24 +232,24 @@ class SemanticParser {
 	[void] MapSymbols() {
 		for ($tokenIndex = 0; $tokenindex -lt $this.inTokens.Count; $tokenIndex++) {
 		    $token = $this.inTokens[$tokenIndex]
-			$scopeid = $this.scopeManager.GetScopeByIndex($tokenIndex).Id
+			$scopeid = $this.scopeManager.GetScopeByIndex($token.Extent.Index).Id
 		    switch($token.Type) {
 		        ([TokenType]::Directive) {
 		            if ($token.Value -match '\.mac(ro)?') {
 						if ($this.IsNextToken($tokenIndex, [TokenType[]]@([TokenType]::Identifier,[TokenType]::Directive))) {
 							$ti = $this.SkipToNextToken($tokenIndex)
 							$this.Macros.Add([pscustomobject]@{ScopeID = $scopeid;Name = $this.inTokens[$ti].Value})
-							$this.symbolManager.AddUnresolvedSymbol($this.inTokens[$ti].Value, $scopeId, $this.inTokens[$ti].Filename, $this.inTokens[$ti].Line, $this.inTokens[$ti].Column)
+							$this.symbolManager.AddUnresolvedSymbol($this.inTokens[$ti].Value, $scopeId, $this.inTokens[$ti].Extent)
 						} else {
-							throw "Macro definition at line $($token.Line), column $($token.Column) missing name"
+							throw "Macro definition missing name at line $($token.Extent.Line), column $($token.Extent.Column) in '$($token.Extent.Filename)'"
 						}
 		            }
 		        }
 		        ([TokenType]::Label) {
-					$this.symbolManager.AddUnresolvedSymbol($token.Value, $scopeId, $token.Filename, $token.Line, $token.Column)
+					$this.symbolManager.AddUnresolvedSymbol($token.Value, $scopeId, $token.Extent)
 		        }
 		        ([TokenType]::AnonymousLabel) {
-					$this.symbolManager.AddUnresolvedSymbol($token.Value, $scopeId, $token.Filename, $token.Line, $token.Column)
+					$this.symbolManager.AddUnresolvedSymbol($token.Value, $scopeId, $token.Extent)
 		        }
 		        ([TokenType]::AnonymousReference) {
 					# $this.symbolManager.AddUnresolvedSymbol($token.Value, $scopeId, $token.Filename, $token.Line, $token.Column)
@@ -258,7 +258,7 @@ class SemanticParser {
 					# Check if previous token is NOT '::' (member access) and if next token is '=' (assignment)
 					# if so, we treat it as a label and add it to the symboltable to enable forward references
 					if (-not $this.IsPrevToken($tokenIndex, [TokenType]::ColonColon) -and $this.IsNextToken($tokenindex, [TokenType]::Equals)) {
-						$this.symbolManager.AddUnresolvedSymbol($token.Value, $scopeId, $token.Filename, $token.Line, $token.Column)
+						$this.symbolManager.AddUnresolvedSymbol($token.Value, $scopeId, $token.Extent)
 					}
 		        }
 			}
@@ -273,13 +273,13 @@ class SemanticParser {
 
 		$nextTokenIndex = $tokenIndex + 1
 		$token = $this.inTokens[$tokenIndex]
-		if ($this.LineCounter -eq 0) { $this.LineMap.Add(++$this.LineCounter, @{File = $token.Filename; Line = ($token.Line)}) }
+		if ($this.LineCounter -eq 0) { $this.LineMap.Add(++$this.LineCounter, @{File = $token.Extent.Filename; Line = ($token.Extent.Line)}) }
 
 		switch($token.Type) {
 			([TokenType]::Label) {
 				$symbolName = $token.Value#.Trim(':')
 
-				$this.AddToken(".label -name $symbolName -scopeId $($this.scopeManager.GetCurrentScope());")
+				$this.AddToken(".label -name $symbolName -scopeId $($this.scopeManager.GetCurrentScope()) -InvocationFile '$($token.Extent.Filename)' -InvocationLine $($token.Extent.Line) -InvocationColumn $($token.Extent.Column);")
 				# $this.symbolManager.AddUnresolvedSymbol($symbolName, $this.scopeManager.GetCurrentScope(), $token.Filename, $token.Line, $token.Column)
 
 				if ($this.IsNextToken($tokenIndex, [TokenType]::LCurly)) {
@@ -289,12 +289,12 @@ class SemanticParser {
 
 			([TokenType]::AnonymousLabel) {
 				$symbolName = $token.Value#"ANON_F$($token.FileId)_L$($token.Line)_C$($token.Column)"
-				$this.AddToken(".label -name $symbolName -scopeId $($this.scopeManager.GetCurrentScope());")
+				$this.AddToken(".label -name $symbolName -scopeId $($this.scopeManager.GetCurrentScope()) -InvocationFile '$($token.Extent.Filename)' -InvocationLine $($token.Extent.Line) -InvocationColumn $($token.Extent.Column);")
 				# $this.symbolManager.AddUnresolvedSymbol($symbolName, $this.scopeManager.GetCurrentScope(), $token.Filename, $token.Line, $token.Column)
 			}
 
 			([TokenType]::AnonymousReference) {
-				$this.AddToken("(_getSymbol '$($token.Value)' $($this.scopeManager.GetCurrentScope()) $($token.Line) $($token.Column))")
+				$this.AddToken("(_getSymbol '$($token.Value)' $($this.scopeManager.GetCurrentScope()) -InvocationFile '$($token.Extent.Filename)' -InvocationLine $($token.Extent.Line) -InvocationColumn $($token.Extent.Column))")
 			}
 
 			([TokenType]::Directive) {
@@ -304,7 +304,7 @@ class SemanticParser {
 					$this.AddToken(" -ScopeID $($this.scopeManager.GetCurrentScope());")
 				}
 				if ($token.Value -in '.byte', '.word', '.text', '.txt', '.petscii', '.ascii', '.fill', '.align') {
-					$this.AddToken(" -InvocationFile '$($token.Filename)' -InvocationLine $($token.Line)")
+					$this.AddToken(" -InvocationFile '$($token.Extent.Filename)' -InvocationLine $($token.Extent.Line) -InvocationColumn $($token.Extent.Column)")
 				}
 				if ($token.Value -match '\.namespace') {
 					$tokenIndex = $this.ParseUntilAfterNextToken($tokenIndex+1, [TokenType]::Identifier)
@@ -312,7 +312,7 @@ class SemanticParser {
 						$nextTokenIndex = $this.SkipToNextToken($tokenIndex, [TokenType]::LCurly)
 						$this.AddToken(";&")
 					} else {
-						throw ".namespace directive at line $($token.Line), column $($token.Column) is missing block definition"
+						throw ".namespace directive is missing block definition at line $($token.Extent.Line), column $($token.Extent.Column) in '$($token.Extent.Filename)'"
 					}
 				}
 			}
@@ -351,9 +351,9 @@ class SemanticParser {
 
 						$sym = $this.symbolManager.ResolveNameAndScope($tval, $this.scopeManager.GetCurrentScope())
 						if ($sym.Resolved) {
-							$this.AddToken(".label -name $($sym.Name) -scopeId $($sym.ScopeId) -addr (")
+							$this.AddToken(".label -name $($sym.Name) -scopeId $($sym.ScopeId) -InvocationFile '$($token.Extent.Filename)' -InvocationLine $($token.Extent.Line) -InvocationColumn $($token.Extent.Column) -addr (")
 						} else {
-							throw "Unresolved symbol '$tval' at line $($token.Line), column $($token.Column). Name and Scope could not be resolved."
+							throw "Unresolved symbol '$tval' at line $($token.Extent.Line), column $($token.Extent.Column) in '$($token.Extent.Filename)'"
 						}
 
 						# Skip the Equal sign
@@ -389,7 +389,7 @@ class SemanticParser {
 							# Maybe even do this in the Tokenizer, since there is a token type PSFunctionParameter, where i btw also make assumtions I should not.
 							# For now I guess if you need to subtract a label/identifier from something, you just need to put a space between the minus and the identifier.
 							if ($this.inTokens[$ti-1].Type -ne [TokenType]::Minus) {
-								$this.AddToken('(_getSymbol "'+$($tval)+'" '+$($this.scopeManager.GetCurrentScope())+' '+$($token.Line)+' '+$($token.Column)+')')
+								$this.AddToken("(_getSymbol '$($tval)' $($this.scopeManager.GetCurrentScope()) -InvocationFile '$($token.Extent.Filename)' -InvocationLine $($token.Extent.Line) -InvocationColumn $($token.Extent.Column))")
 								$nextTokenIndex = $ti+1
 								break
 							}
@@ -444,7 +444,7 @@ class SemanticParser {
 				if ($this.hashTableCounter.Counters[0] -gt 0) {
 					$this.hashTableCounter.Inc(1)
 				}
-				$this.scopeManager.EnterScope($tokenIndex)
+				$this.scopeManager.EnterScope($token.Extent.Index)
 				$this.AddToken($token.Value)
 				$ti = $tokenIndex+1
 				while ($this.inTokens[$ti].Type -notin $null, [TokenType]::RCurly) { $ti = $this.ParseToken($ti) }
@@ -542,7 +542,7 @@ class SemanticParser {
 							# Support label definitions at operand position, e.g. "lda myLabel:#0; inc myLabel;"
 							$symbolName = $tk.Value
 							$scopeId = $this.scopeManager.GetCurrentScope()
-							$this.AddToken(".label -name $($symbolName) -scopeId $($scopeId) -addr ((.pc) + 1);")
+							$this.AddToken(".label -name $($symbolName) -scopeId $($scopeId) -addr ((.pc) + 1) -InvocationFile '$($tk.Extent.Filename)' -InvocationLine $($tk.Extent.Line) -InvocationColumn $($tk.Extent.Column);")
 							# $this.symbolManager.AddUnresolvedSymbol($symbolName, $scopeId, $tk.Filename, $tk.Line, $tk.Column)
 							break
 						}
@@ -550,7 +550,7 @@ class SemanticParser {
 							# Support anonymous label definitions at operand position, e.g. "lda :#0; inc :-;"
 							$symbolName = $tk.Value# "ANON_F$($tk.FileId)_L$($tk.Line)_C$($tk.Column)"
 							$scopeId = $this.scopeManager.GetCurrentScope()
-							$this.AddToken(".label -name $($symbolName) -scopeId $($scopeId) -addr ((.pc) + 1);")
+							$this.AddToken(".label -name $($symbolName) -scopeId $($scopeId) -addr ((.pc) + 1) -InvocationFile '$($tk.Extent.Filename)' -InvocationLine $($tk.Extent.Line) -InvocationColumn $($tk.Extent.Column);")
 							# $this.symbolManager.AddUnresolvedSymbol($symbolName, $scopeId, $tk.Filename, $tk.Line, $tk.Column)
 							break
 						}
@@ -621,17 +621,17 @@ class SemanticParser {
 
 					if ($startIndex -eq $endIndex -or (($this.outTokens[$startIndex..($endIndex-1)].Value -join '') -match '^(?s:\s|<#.*?#>|#.*$|//.*$)*$')) {
 						# If no operand was found or if it only contains whitespace/comments, throw an error
-						throw "Parser error: No operand found for instruction '$mne' in addressing mode '$($addressingMode)' at line $($token.Line), column $($token.Column)"
+						throw "Parser error: No operand found for instruction '$mne' in addressing mode '$($addressingMode)' at line $($token.Extent.Line), column $($token.Extent.Column) in '$($token.Extent.Filename)'"
 					}
 
 					$this.AddToken(")")
 				}
-				$this.AddToken(" -InvocationFile '$($token.Filename)' -InvocationLine $($token.Line)")
+				$this.AddToken(" -InvocationFile '$($token.Extent.Filename)' -InvocationLine $($token.Extent.Line) -InvocationColumn $($token.Extent.Column)")
 				$nextTokenIndex = $instEndIndex
 			}
 
 			([TokenType]::Newline) {
-				$this.LineMap.Add(++$this.LineCounter, @{File = $token.Filename; Line = ($token.Line+1)})
+				$this.LineMap.Add(++$this.LineCounter, @{File = $token.Extent.Filename; Line = ($token.Extent.Line+1)})
 				$this.AddToken($token.Value)
 			}
 

@@ -3,10 +3,11 @@ function .fill {
 		[int]$count,
 		[scriptblock]$data,
 		[string]$InvocationFile,
-		[int]$InvocationLine
+		[int]$InvocationLine,
+		[int]$InvocationColumn
 	)
 
 	if ($count -gt 0) {
-		.byte -Values (0..($count-1) | ForEach-Object $data) -InvocationFile $InvocationFile -InvocationLine $InvocationLine
+		.byte -Values (0..($count-1) | ForEach-Object $data) -InvocationFile $InvocationFile -InvocationLine $InvocationLine -InvocationColumn $InvocationColumn
 	}
 }

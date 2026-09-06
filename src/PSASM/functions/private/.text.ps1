@@ -7,7 +7,8 @@ function .text {
 		[switch]$AsPETSCII,
 
 		[string]$InvocationFile,
-		[int]$InvocationLine
+		[int]$InvocationLine,
+		[int]$InvocationColumn
 	)
 
 	[byte[]]$values = @()
@@ -34,7 +35,7 @@ function .text {
 		}
 	}
 
-	$psasm.DataAdd($values, $InvocationFile, $InvocationLine)
+	$psasm.DataAdd($values, $InvocationFile, $InvocationLine, $InvocationColumn)
 }
 
 # function .petscii { .text $args -AsPETSCII }

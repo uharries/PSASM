@@ -3,13 +3,14 @@ function _getSymbol {
 		[Parameter(Mandatory)]
 		[string]$name,
 		[int]$scopeId = 0,
-		[int]$callerLine,
-		[int]$callerColumn
+		[string]$InvocationFile,
+		[int]$InvocationLine,
+		[int]$InvocationColumn
 	)
 	# Write-Host "_getSymbol('$name', $scopeId, $callerLine, $callerColumn)" -ForegroundColor Magenta
 	# Write-Host "  _getSymbol: return $($psasm.symbolManager.GetSymbol($name, $scopeId, $callerLine, $callerColumn, $MyInvocation).Value)" -ForegroundColor Magenta
 	# $val = $sym.Values.Count -gt 0 ? $sym.Values[$sym.Values.Count - 1] : 0
-	$symVal = [object]$psasm.symbolManager.GetSymbol($name, $scopeId, $callerLine, $callerColumn, $MyInvocation).Value
+	$symVal = [object]$psasm.symbolManager.GetSymbol($name, $scopeId, $InvocationFile, $InvocationLine, $InvocationColumn, $MyInvocation).Value
 
 	# this effectively makes the [Undefined] checks in the directives like .byte and .word never trigger
 	# not really sure what troubles will come from this, but the alternatives appear a lot more complicated...

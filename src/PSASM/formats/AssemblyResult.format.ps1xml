@@ -182,6 +182,67 @@
       </TableControl>
     </View>
 
+    <View>
+      <Name>TokenTable</Name>
+
+      <ViewSelectedBy>
+        <TypeName>Token</TypeName>
+      </ViewSelectedBy>
+      <TableControl>
+        <TableHeaders>
+          <TableColumnHeader>
+            <Label>Type</Label>
+          </TableColumnHeader>
+          <TableColumnHeader>
+            <Label>Value</Label>
+          </TableColumnHeader>
+          <TableColumnHeader>
+            <Label>Filename</Label>
+          </TableColumnHeader>
+          <TableColumnHeader>
+            <Label>Line</Label>
+          </TableColumnHeader>
+          <TableColumnHeader>
+            <Label>Column</Label>
+          </TableColumnHeader>
+          <TableColumnHeader>
+            <Label>Length</Label>
+          </TableColumnHeader>
+        </TableHeaders>
+        <TableRowEntries>
+          <TableRowEntry>
+            <TableColumnItems>
+              <TableColumnItem>
+                <PropertyName>Type</PropertyName>
+              </TableColumnItem>
+              <TableColumnItem>
+                <PropertyName>Value</PropertyName>
+              </TableColumnItem>
+              <TableColumnItem>
+                <ScriptBlock>
+                  $_.Extent.Filename
+                </ScriptBlock>
+              </TableColumnItem>
+              <TableColumnItem>
+                <ScriptBlock>
+                  $_.Extent.Line
+                </ScriptBlock>
+              </TableColumnItem>
+              <TableColumnItem>
+                <ScriptBlock>
+                  $_.Extent.Column
+                </ScriptBlock>
+              </TableColumnItem>
+              <TableColumnItem>
+                <ScriptBlock>
+                  $_.Extent.Length
+                </ScriptBlock>
+              </TableColumnItem>
+            </TableColumnItems>
+          </TableRowEntry>
+        </TableRowEntries>
+      </TableControl>
+    </View>
 
   </ViewDefinitions>
 </Configuration>

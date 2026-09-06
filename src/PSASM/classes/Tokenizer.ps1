@@ -93,12 +93,14 @@ class Tokenizer {
 		$token = [Token]::new(
 			$tokenType,
 			$lexeme,
-			$this.tokenStart,
-			($this.cpos - $this.tokenStart),
-			$this.tline,
-			$this.tcolumn,
-			$this.tfileid,
-			$this.tfile
+			[SourceExtent]::new(
+				$this.tfileid,
+				$this.tfile,
+				$this.tokenStart,
+				$this.tline,
+				$this.tcolumn,
+				($this.cpos - $this.tokenStart)
+			)
 		)
 
 		return $token

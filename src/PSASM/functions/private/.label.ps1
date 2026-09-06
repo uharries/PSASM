@@ -6,8 +6,11 @@ function .label {
 		# [ValidateScript({!$psasm.symbols[$_].resolved}, ErrorMessage="Symbol '{0}' already defined!")]
 		[string]$name,
 		[int]$scopeId,
+		[object]$addr = [UInt16]$psasm.Segments.Current.PC,
 
-		[object]$addr = [UInt16]$psasm.Segments.Current.PC
+		[string]$InvocationFile,
+		[int]$InvocationLine,
+		[int]$InvocationColumn
 	)
 
 	# Write-Host ".label(name='$name', scopeId=$scopeId, addr=$addr)" -ForegroundColor Magenta
@@ -25,7 +28,7 @@ function .label {
 		$width = 0
 	}
 	# write-host "`nGetSymbol($name,$scopeId)"
-	$oldSym = $psasm.symbolManager.GetSymbol($name, $scopeId, 0,0, $MyInvocation)
+	$oldSym = $psasm.symbolManager.GetSymbol($name, $scopeId, $InvocationFile, $InvocationLine, $InvocationColumn, $MyInvocation)
 	# write-host "Name: $($oldSym.Name)"
 	# write-host "Value: $($oldSym.Value)"
 	# write-host "Width: $($oldSym.Width)"

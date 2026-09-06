@@ -5,12 +5,13 @@ function .word {
 		[object[]]$values,
 
 		[string]$InvocationFile,
-		[int]$InvocationLine
+		[int]$InvocationLine,
+		[int]$InvocationColumn
 	)
 
 	$normalized = foreach ($v in $values) {
 		$v -is [Undefined] ? [UInt16]0 : [UInt16]($v -band 0xffff)
 	}
 
-	$psasm.DataAdd($normalized, $InvocationFile, $InvocationLine)
+	$psasm.DataAdd($normalized, $InvocationFile, $InvocationLine, $InvocationColumn)
 }

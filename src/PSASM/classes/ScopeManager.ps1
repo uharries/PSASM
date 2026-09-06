@@ -7,34 +7,37 @@ class ScopeManager {
 	ScopeManager() {
 		$this.scopeStack = [System.Collections.Generic.Stack[int]]::new()
 		$this.scopes = [System.Collections.Generic.List[Scope]]::new()
-		$this.EnterNewScope(0,1,1)
+		$this.EnterNewScope([SourceExtent]::new($null,$null,0,1,1,$null))
 	}
 
 
-	[void] EnterNewScope([string]$name, [int]$startIndex, [int]$line, [int]$column) {
+	[void] EnterNewScope([string]$name, [SourceExtent]$extent) {
 		$scope = [Scope]::new()
 		$scope.id = $this.nextScopeId++
 		$scope.Name = $name
 		$scope.parentId = if ($this.scopeStack.Count -gt 0) { $this.scopeStack.Peek() } else { 0 }
-		$scope.startIndex = $startIndex
-		$scope.StartLine = $line
-		$scope.StartColumn = $column
+		$scope.startIndex = $extent.Index
+		$scope.StartLine = $extent.Line
+		$scope.StartColumn = $extent.Column
+		if ($name -ne '' -and $this.scopes.Where({$_.Name -eq $scope.name -and $_.ParentId -eq $scope.ParentId})) {
+			throw "Duplicate scope name '$($name)' defined at line $($extent.line), column $($extent.column) in '$($extent.Filename)'"
+		}
 		$this.scopes.Add($scope)
 		$this.scopeStack.Push($scope.Id)
 	}
 
 
-	[void] EnterNewScope([int]$startIndex, [int]$line, [int]$column) {
-		$this.EnterNewScope("", $startIndex, $line, $column)
+	[void] EnterNewScope([SourceExtent]$extent) {
+		$this.EnterNewScope("", $extent)
 	}
 
 
-	[void] ExitNewScope([int]$endIndex, [int]$line, [int]$column) {
+	[void] ExitNewScope([SourceExtent]$extent) {
 		$id = $this.scopeStack.Pop()
 		$scope = $this.scopes | Where-Object { $_.id -eq $id }
-		$scope.endIndex = $endIndex
-		$scope.EndLine = $line
-		$scope.EndColumn = $column
+		$scope.endIndex = $extent.Index
+		$scope.EndLine = $extent.Line
+		$scope.EndColumn = $extent.Colum
 		if ($this.scopeStack.Count -eq 0) {
 			$this.EnterScope(0)
 		}
