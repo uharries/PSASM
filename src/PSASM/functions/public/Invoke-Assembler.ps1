@@ -199,6 +199,13 @@ function Invoke-Assembler {
 			}
 		}
 
+		if ($LabelFile) {
+			if (-not(Test-Path -Path $LabelFile)) {
+				$null = New-Item -Path $LabelFile -Force
+			}
+			$asmInfo.symbols.ForEach({"al {0:x6} .{1}" -f $_.Value, $_.FQName}) | set-content -path $LabelFile -Force
+		}
+
 		if ($OutFile) {
 			if (-not $NoHostOutput) {
 				Write-Host ("`nWriting '$OutFile'...") -NoNewline
@@ -223,12 +230,6 @@ function Invoke-Assembler {
 				}
 
 				Write-Host ("File Hash: {0:x}" -f $hash)
-			}
-			if ($LabelFile) {
-				if (-not(Test-Path -Path $LabelFile)) {
-					$null = New-Item -Path $LabelFile -Force
-				}
-				$asmInfo.symbols.ForEach({"al {0:x6} .{1}" -f $_.Value, $_.Name}) | set-content -path $LabelFile -Force
 			}
 		}
 
