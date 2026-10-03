@@ -38,7 +38,7 @@ class SymbolManager {
 		$this.SetSymbol($sym)
 	}
 
-	[void] AddUnresolvedSymbol([string]$name, [string]$scopeId, [SourceExtent]$extent) {
+	[void] AddUnresolvedSymbol([string]$name, [SymbolType]$type, [string]$scopeId, [SourceExtent]$extent) {
 		$key = "$name|$scopeId"
 
 		# if ($this.definitions[$key]) {
@@ -54,6 +54,7 @@ class SymbolManager {
 
 		$sym = [SymbolEntry]::new()
 		$sym.Name = $name
+		$sym.Type = $type
 		$sym.ScopeId = $scopeId
 		$sym.Filename = $extent.Filename
 		$sym.Line = $extent.Line
@@ -211,6 +212,7 @@ class SymbolManager {
 						Name     = $name
 						Scope    = $scopeId
 						Instance = $instance
+						Type     = $sym.Type
 						Value    = $sym.value
 						Width    = $sym.Width
 						Filename = $sym.Filename
@@ -241,6 +243,7 @@ class SymbolManager {
 							SymName   = $symbol.Name
 							SymScope  = $symbol.ScopeId
 							SymPass   = $symbol.Pass
+							Type      = $symbol.Type
 							Value     = $symbol.Value
 							Width     = $symbol.Width
 							Line      = $symbol.Line

@@ -130,6 +130,9 @@
             <Label>Instance</Label>
           </TableColumnHeader>
           <TableColumnHeader>
+            <Label>Type</Label>
+          </TableColumnHeader>
+          <TableColumnHeader>
             <Label>Value</Label>
           </TableColumnHeader>
           <TableColumnHeader>
@@ -160,6 +163,9 @@
               </TableColumnItem>
               <TableColumnItem>
                 <PropertyName>Instance</PropertyName>
+              </TableColumnItem>
+              <TableColumnItem>
+                <PropertyName>Type</PropertyName>
               </TableColumnItem>
               <TableColumnItem>
                 <PropertyName>Value</PropertyName>

@@ -6,3 +6,4 @@ src/PSASM/globals/VersionInfo.ps1
 test/*.lbl
 test/*.lst
 test/*.mon
+test/debug.*

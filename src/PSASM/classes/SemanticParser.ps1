@@ -239,26 +239,26 @@ class SemanticParser {
 						if ($this.IsNextToken($tokenIndex, [TokenType[]]@([TokenType]::Identifier,[TokenType]::Directive))) {
 							$ti = $this.SkipToNextToken($tokenIndex)
 							$this.Macros.Add([pscustomobject]@{ScopeID = $scopeid;Name = $this.inTokens[$ti].Value})
-							$this.symbolManager.AddUnresolvedSymbol($this.inTokens[$ti].Value, $scopeId, $this.inTokens[$ti].Extent)
+							$this.symbolManager.AddUnresolvedSymbol($this.inTokens[$ti].Value, [SymbolType]::Macro, $scopeId, $this.inTokens[$ti].Extent)
 						} else {
 							throw "Macro definition missing name at line $($token.Extent.Line), column $($token.Extent.Column) in '$($token.Extent.Filename)'"
 						}
 		            }
 		        }
 		        ([TokenType]::Label) {
-					$this.symbolManager.AddUnresolvedSymbol($token.Value, $scopeId, $token.Extent)
+					$this.symbolManager.AddUnresolvedSymbol($token.Value, [SymbolType]::Label, $scopeId, $token.Extent)
 		        }
 		        ([TokenType]::AnonymousLabel) {
-					$this.symbolManager.AddUnresolvedSymbol($token.Value, $scopeId, $token.Extent)
+					$this.symbolManager.AddUnresolvedSymbol($token.Value, [SymbolType]::AnonymousLabel, $scopeId, $token.Extent)
 		        }
 		        ([TokenType]::AnonymousReference) {
-					# $this.symbolManager.AddUnresolvedSymbol($token.Value, $scopeId, $token.Filename, $token.Line, $token.Column)
+					# $this.symbolManager.AddUnresolvedSymbol($token.Value, [SymbolType]::AnonymousReference, $scopeId, $token.Extent)
 		        }
 		        ([TokenType]::Identifier) {
 					# Check if previous token is NOT '::' (member access) and if next token is '=' (assignment)
 					# if so, we treat it as a label and add it to the symboltable to enable forward references
 					if (-not $this.IsPrevToken($tokenIndex, [TokenType]::ColonColon) -and $this.IsNextToken($tokenindex, [TokenType]::Equals)) {
-						$this.symbolManager.AddUnresolvedSymbol($token.Value, $scopeId, $token.Extent)
+						$this.symbolManager.AddUnresolvedSymbol($token.Value, [SymbolType]::Constant, $scopeId, $token.Extent)
 					}
 		        }
 			}
@@ -289,7 +289,7 @@ class SemanticParser {
 
 			([TokenType]::AnonymousLabel) {
 				$symbolName = $token.Value#"ANON_F$($token.FileId)_L$($token.Line)_C$($token.Column)"
-				$this.AddToken(".label -name $symbolName -scopeId $($this.scopeManager.GetCurrentScope()) -InvocationFile '$($token.Extent.Filename)' -InvocationLine $($token.Extent.Line) -InvocationColumn $($token.Extent.Column);")
+				$this.AddToken(".label -name $symbolName -type AnonymousLabel -scopeId $($this.scopeManager.GetCurrentScope()) -InvocationFile '$($token.Extent.Filename)' -InvocationLine $($token.Extent.Line) -InvocationColumn $($token.Extent.Column);")
 				# $this.symbolManager.AddUnresolvedSymbol($symbolName, $this.scopeManager.GetCurrentScope(), $token.Filename, $token.Line, $token.Column)
 			}
 
@@ -550,7 +550,7 @@ class SemanticParser {
 							# Support anonymous label definitions at operand position, e.g. "lda :#0; inc :-;"
 							$symbolName = $tk.Value# "ANON_F$($tk.FileId)_L$($tk.Line)_C$($tk.Column)"
 							$scopeId = $this.scopeManager.GetCurrentScope()
-							$this.AddToken(".label -name $($symbolName) -scopeId $($scopeId) -addr ((.pc) + 1) -InvocationFile '$($tk.Extent.Filename)' -InvocationLine $($tk.Extent.Line) -InvocationColumn $($tk.Extent.Column);")
+							$this.AddToken(".label -name $($symbolName) -type AnonymousLabel -scopeId $($scopeId) -addr ((.pc) + 1) -InvocationFile '$($tk.Extent.Filename)' -InvocationLine $($tk.Extent.Line) -InvocationColumn $($tk.Extent.Column);")
 							# $this.symbolManager.AddUnresolvedSymbol($symbolName, $scopeId, $tk.Filename, $tk.Line, $tk.Column)
 							break
 						}
