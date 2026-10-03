@@ -210,7 +210,7 @@ class Assembler {
 	###
 	### Assembly Lister
 	###
-	[string]ListAssembly() {
+	[string]ListAssemblyOld() {
 		$sb = [System.Text.StringBuilder]::new(1024)
 		$sbl = [System.Text.StringBuilder]::new(64)
 		$currentDir = $this.FileStack.AllContexts[0].FilePath
@@ -244,6 +244,153 @@ class Assembler {
 		return $sb.ToString()
 	}
 
+	###
+	### Assembly Lister
+	###
+	[string]ListAssembly() {
+		$sb = [System.Text.StringBuilder]::new(1024)
+		$sbl = [System.Text.StringBuilder]::new(64)
+
+		$currentDir = $this.FileStack.AllContexts[0].FilePath
+		if (Test-Path $currentDir) {
+			$currentDir = Split-Path $currentDir -Parent
+		}
+		else {
+			$currentDir = (Get-Location).ProviderPath
+		}
+
+		#
+		# Build label lookup by address.
+		#
+		$labels = @{}
+		foreach ($symbol in $this.symbolManager?.GetSymbolTable()) {
+			if ($symbol.Type -ne [SymbolType]::Label -and
+				$symbol.Type -ne [SymbolType]::AnonymousLabel) {
+				continue
+			}
+
+			[int]$address = 0
+			if (-not [int]::TryParse([string]$symbol.Value, [ref]$address)) {
+				continue
+			}
+
+			if (-not $labels.ContainsKey($address)) {
+				$labels[$address] = [System.Collections.Generic.List[string]]::new()
+			}
+
+			$name = if ($symbol.Type -eq [SymbolType]::AnonymousLabel) { '' } else { $symbol.Name }
+			$labels[$address].Add($name)
+		}
+
+		# Segments are ordered by their calculated start address.
+		$segs = @(
+			$this.Segments.Segments.Values |
+				Sort-Object realStart
+		)
+
+		foreach ($segment in $segs) {
+
+			# All assembly entries belonging to this segment, ordered by address.
+			$asm = @(
+				$this.assembly |
+					Where-Object { $_.segmentName -eq $segment.Name } |
+					Sort-Object addr
+			)
+
+			# Segment header
+			if ($sb.Length -gt 0) {
+				[void]$sb.AppendLine()
+			}
+
+			[void]$sb.AppendFormat(
+				"### Segment: `"{0}`"  Start: `${1:x4}  Size: {2}",
+				$segment.Name,
+				$segment.realStart,
+				$segment.realSize
+			)
+			[void]$sb.AppendLine()
+
+			# Empty / virtual segment
+			if ($asm.Count -eq 0 -or $segment.Virtual) {
+				[void]$sb.AppendLine("<no output>")
+				continue
+			}
+
+			$currentFile = $null
+
+			foreach ($line in $asm) {
+
+				# Display file whenever it changes
+				if ($line.fileName -ne $currentFile) {
+
+					$displayFile = if (Test-Path $line.fileName) {
+						Resolve-Path $line.fileName -Relative -RelativeBasePath $currentDir
+					}
+					else {
+						$line.fileName
+					}
+
+					[void]$sb.AppendFormat("[File: `"{0}`"]", $displayFile)
+					[void]$sb.AppendLine()
+
+					$currentFile = $line.fileName
+				}
+
+				$ln = $line.lineNumber
+				$d = $line.asmLineText -replace '\b[a-z_][a-z0-9_]*:|:(?![+-])', ''
+				$d = $d.Trim()
+
+				# Find label(s) at this address
+				$label = if ($labels.ContainsKey([int]$line.addr)) {
+					($labels[[int]$line.addr] -join ',') + ':'
+				}
+				else {
+					''
+				}
+
+				#
+				# Output the data in 16-byte lines. The source information
+				# is only displayed on the first line.
+				#
+				for ($offset = 0; $offset -lt $line.bytes.Count; $offset += 16) {
+
+					$count = [Math]::Min(16, $line.bytes.Count - $offset)
+
+					$sbl.Clear()
+					for ($i = 0; $i -lt $count; $i++) {
+						[void]$sbl.AppendFormat(
+							"{0:x2} ",
+							$line.bytes[$offset + $i]
+						)
+					}
+
+					$address = $line.addr + $offset
+
+					if ($offset -eq 0) {
+						[void]$sb.AppendFormat(
+							"`${0:x4}: {1,-15} Ln: {2,-4} - {3,-10} {4}",
+							$address,
+							$sbl.ToString(),
+							$ln,
+							$label,
+							$d
+						)
+					}
+					else {
+						[void]$sb.AppendFormat(
+							"`${0:x4}: {1}",
+							$address,
+							$sbl.ToString()
+						)
+					}
+
+					[void]$sb.AppendLine()
+				}
+			}
+		}
+
+		return $sb.ToString()
+	}
 
 	###
 	### Binary Hex Dumper - Yes, I forgot PS has a Format-Hex command, but mine is neater ;-)

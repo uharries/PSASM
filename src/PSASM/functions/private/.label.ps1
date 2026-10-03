@@ -5,6 +5,7 @@ function .label {
 		[ValidatePattern("^\w+$")]
 		# [ValidateScript({!$psasm.symbols[$_].resolved}, ErrorMessage="Symbol '{0}' already defined!")]
 		[string]$name,
+		[SymbolType]$type = [SymbolType]::Label,
 		[int]$scopeId,
 		[object]$addr = [UInt16]$psasm.Segments.Current.PC,
 
@@ -36,7 +37,7 @@ function .label {
 	# write-host "Pass: $($oldSym.Pass)"
 	# write-host "Line: $($oldSym.Line)"
 	# write-host "Column: $($oldSym.Column)"
-	$sym = [SymbolEntry]::new($name, $addr, $width, $scopeId, $psasm.CurrentPass, $oldSym.Filename, $oldSym.Line, $oldSym.Column)
+	$sym = [SymbolEntry]::new($name, $addr, $width, $type, $scopeId, $psasm.CurrentPass, $oldSym.Filename, $oldSym.Line, $oldSym.Column)
 
 	# write-host "  .label: SetSymbol(sym={name=$name, addr=$addr, width=$width, scopeId=$scopeId, pass=$($psasm.CurrentPass), line=$($oldSym.Line), column=$($oldSym.Column)})" -ForegroundColor Magenta
 	$psasm.symbolManager.SetSymbol($sym)
